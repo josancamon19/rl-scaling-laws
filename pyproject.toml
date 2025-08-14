@@ -5,5 +5,22 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "flash-attn>=2.8.2",
+    "sync>=1.0.0",
+    "torch>=2.7.1",
+    "uv>=0.8.10",
     "verl>=0.5.0",
+    "vllm>=0.10.0",
+    "wandb>=0.21.1",
 ]
+[tool.uv]
+no-build-isolation-package = ["flash-attn"]
+
+[tool.pytest.ini_options]
+log_cli = true
+log_cli_level = "WARNING"
+
+[[tool.uv.dependency-metadata]]
+name = "flash-attn"
+version = "2.7.4.post1"
+requires-dist = ["torch", "einops", "setuptools"]

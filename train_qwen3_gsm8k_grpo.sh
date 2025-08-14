@@ -24,62 +24,12 @@ TEST_PARQUET="${DATA_DIR}/test.parquet"
 
 if [[ -f "${TRAIN_JSON}" && ! -f "${TRAIN_PARQUET}" ]]; then
   echo "Converting ${TRAIN_JSON} -> ${TRAIN_PARQUET}"
-  python3 - "$TRAIN_JSON" "$TRAIN_PARQUET" <<'PY'
-import sys, json
-import importlib, subprocess
-
-def ensure_pyarrow_installed() -> None:
-    if importlib.util.find_spec('pyarrow') is None:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pyarrow'])
-
-def convert_jsonl_to_parquet(src: str, dst: str) -> None:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-    rows = []
-    with open(src, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-    table = pa.Table.from_pylist(rows)
-    pq.write_table(table, dst)
-
-if __name__ == '__main__':
-    src, dst = sys.argv[1], sys.argv[2]
-    ensure_pyarrow_installed()
-    convert_jsonl_to_parquet(src, dst)
-PY
+  python3 "${ROOT_DIR}/jsonl_to_parquet.py" "$TRAIN_JSON" "$TRAIN_PARQUET"
 fi
 
 if [[ -f "${TEST_JSON}" && ! -f "${TEST_PARQUET}" ]]; then
   echo "Converting ${TEST_JSON} -> ${TEST_PARQUET}"
-  python3 - "$TEST_JSON" "$TEST_PARQUET" <<'PY'
-import sys, json
-import importlib, subprocess
-
-def ensure_pyarrow_installed() -> None:
-    if importlib.util.find_spec('pyarrow') is None:
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pyarrow'])
-
-def convert_jsonl_to_parquet(src: str, dst: str) -> None:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-    rows = []
-    with open(src, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            rows.append(json.loads(line))
-    table = pa.Table.from_pylist(rows)
-    pq.write_table(table, dst)
-
-if __name__ == '__main__':
-    src, dst = sys.argv[1], sys.argv[2]
-    ensure_pyarrow_installed()
-    convert_jsonl_to_parquet(src, dst)
-PY
+  python3 "${ROOT_DIR}/jsonl_to_parquet.py" "$TEST_JSON" "$TEST_PARQUET"
 fi
 
 ARGS=(
@@ -105,7 +55,7 @@ ARGS=(
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=20
   algorithm.use_kl_in_reward=False
   trainer.critic_warmup=0
-  trainer.logger=['console']
+  trainer.logger=['console','wandb']
   "trainer.project_name=${PROJECT_NAME}"
   "trainer.experiment_name=${EXPERIMENT_NAME}"
   trainer.n_gpus_per_node=1
