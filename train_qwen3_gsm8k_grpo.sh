@@ -7,9 +7,9 @@ set -x
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${DATA_DIR:-${ROOT_DIR}/data/gsm8k}"
-MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-0.6B-Base}"
+MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-1.7B-Base}"
 PROJECT_NAME="${PROJECT_NAME:-verl_grpo_gsm8k}"
-EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_0.6b_grpo}"
+EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_1.7b_grpo}"
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
@@ -60,7 +60,7 @@ ARGS=(
   "trainer.experiment_name=${EXPERIMENT_NAME}"
   trainer.n_gpus_per_node=1
   trainer.nnodes=1
-  trainer.save_freq=-1
+  trainer.save_freq=5
   trainer.test_freq=5
   trainer.total_epochs=15
 )
