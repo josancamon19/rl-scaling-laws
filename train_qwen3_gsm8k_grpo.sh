@@ -2,14 +2,35 @@
 set -euo pipefail
 set -x
 
-# Minimal GRPO training on GSM8K with Verl + Qwen/Qwen3-0.6B-Base
-# If JSONL files are present (train.jsonl / test.jsonl), they will be converted to Parquet automatically.
+# Optimized GRPO training on GSM8K with Verl + Qwen/Qwen3-1.7B-Base
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${DATA_DIR:-${ROOT_DIR}/data/gsm8k}"
 MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-1.7B-Base}"
 PROJECT_NAME="${PROJECT_NAME:-verl_grpo_gsm8k}"
-EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_1.7b_grpo}"
+EXPERIMENT_NAME="${EXPERIMENT_NAME:-qwen3_1.7b_grpo_optimized}"
+
+# Ensure model is cached
+export HF_HOME="${HF_HOME:-/tmp/huggingface}"
+# export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-/tmp/huggingface/transformers}"
+
+# Ray optimization settings
+export RAY_DEDUP_LOGS=0
+export CUDA_LAUNCH_BLOCKING=0
+export NCCL_DEBUG=INFO
+
+# Pre-download model if not cached
+python3 -c "
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+print('Checking model cache...')
+try:
+    model = AutoModelForCausalLM.from_pretrained('${MODEL_PATH}', torch_dtype=torch.bfloat16, cache_dir='${HF_HOME}')
+    tokenizer = AutoTokenizer.from_pretrained('${MODEL_PATH}', cache_dir='${HF_HOME}')
+    print('Model ready in cache')
+except Exception as e:
+    print(f'Model download needed: {e}')
+"
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
@@ -40,29 +61,42 @@ ARGS=(
   data.max_response_length=512
   "actor_rollout_ref.model.path=${MODEL_PATH}"
   actor_rollout_ref.model.enable_gradient_checkpointing=True
+  actor_rollout_ref.model.trust_remote_code=True
   actor_rollout_ref.actor.optim.lr=1e-6
-  actor_rollout_ref.actor.ppo_mini_batch_size=80
-  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=20
+  actor_rollout_ref.actor.ppo_mini_batch_size=240
+  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=30
   actor_rollout_ref.actor.use_kl_loss=True
   actor_rollout_ref.actor.kl_loss_coef=0.001
   actor_rollout_ref.actor.kl_loss_type=low_var_kl
   actor_rollout_ref.actor.entropy_coeff=0
   actor_rollout_ref.rollout.name=vllm
   actor_rollout_ref.rollout.n=3
-  actor_rollout_ref.rollout.gpu_memory_utilization=0.6
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.85
   actor_rollout_ref.rollout.tensor_model_parallel_size=1
+  actor_rollout_ref.rollout.enforce_eager=False
+  actor_rollout_ref.rollout.dtype=bfloat16
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=20
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=20
   algorithm.use_kl_in_reward=False
   trainer.critic_warmup=0
-  trainer.logger=['console','wandb']
+  trainer.logger=['console']
   "trainer.project_name=${PROJECT_NAME}"
   "trainer.experiment_name=${EXPERIMENT_NAME}"
-  trainer.n_gpus_per_node=1
+  trainer.n_gpus_per_node=8
   trainer.nnodes=1
   trainer.save_freq=5
   trainer.test_freq=5
   trainer.total_epochs=15
+  # faster?
+  ray_init.num_cpus=120
+  data.dataloader_num_workers=32  # Up from default 8
+  # Allocate more CPUs per GPU worker
+  # actor_rollout_ref.actor.num_cpus_per_node=14  # 96 CPUs for 8 GPU workers
+  # actor_rollout_ref.rollout.num_cpus_per_node=14
+
+  # Enable parallel tokenization for vLLM
+  # actor_rollout_ref.rollout.max_num_seqs=256  # Increase concurrent sequences
+  # actor_rollout_ref.rollout.enable_prefix_caching=True  # Cache common prefixes
 )
 
 if [[ -f "${TEST_PARQUET}" ]]; then
@@ -70,5 +104,3 @@ if [[ -f "${TEST_PARQUET}" ]]; then
 fi
 
 python3 -m verl.trainer.main_ppo "${ARGS[@]}"
-
-
