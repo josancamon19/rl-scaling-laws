@@ -3,7 +3,7 @@ set -euo pipefail
 set -x
 
 # Parse command line arguments
-MODEL_SIZE="${1:-4B}" 
+MODEL_SIZE="${1:-14B}" 
 # tried 1e-5, follows a very similar shape
 LEARNING_RATE="${2:-1e-6}"  # Default learning rate
 BATCH_SIZE="${3:-512}"  # Default batch size
@@ -14,7 +14,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${DATA_DIR:-${ROOT_DIR}/data/gsm8k}"
 
 # Validate model size and construct paths
-VALID_SIZES=("0.6B" "1.7B" "4B" "7B" "14B")
+VALID_SIZES=("0.6B" "1.7B" "4B" "8B" "14B")
 SIZE_FOUND=false
 
 for valid_size in "${VALID_SIZES[@]}"; do
@@ -32,8 +32,8 @@ fi
 
 
 # Construct model path and name using concatenation
-MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-${ACTUAL_SIZE}-Base}"
-MODEL_NAME="qwen3_${ACTUAL_SIZE,,}"  # Convert to lowercase
+MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-${MODEL_SIZE}-Base}"
+MODEL_NAME="qwen3_${MODEL_SIZE,,}"  # Convert to lowercase
 MODEL_NAME="${MODEL_NAME//./_}"  # Replace . with _
 
 PROJECT_NAME="${PROJECT_NAME:-verl_grpo_gsm8k}"
@@ -53,6 +53,9 @@ echo "  Experiment: ${EXPERIMENT_NAME}"
 
 # Pre-download model if not cached
 (
+  unset HF_HUB_OFFLINE
+  unset TRANSFORMERS_OFFLINE  
+  unset HF_DATASETS_OFFLINE 
     python3 -c "
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
@@ -80,9 +83,9 @@ except Exception as e:
 "
 )
 
-export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
-export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
-export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
+# export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
+# export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
+# export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
@@ -132,10 +135,11 @@ ARGS=(
   # we have now to process batch_size*3 to be process before .step() is called
   actor_rollout_ref.actor.ppo_mini_batch_size=$((BATCH_SIZE / 4)) # .backward() called
   # each gpu process 1/n of mini batch_size ideally, then we call .backward()
+  # set 2 for 14B params
   actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 # accumulate ppo_mini_batch_size/this*n_gpus times
-  # making the log probs in parallel as well
-  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=4
-  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4
+  # making the log probs in parallel as well, consume less memory, cause no activations needed
+  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8 # can be 16 on <= 4B
+  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=8
   
   data.max_prompt_length=512 # might cut a few prompts short
   data.max_response_length=512 # limit responses length to
@@ -157,3 +161,4 @@ ARGS=(
 
 python3 -m verl.trainer.main_ppo "${ARGS[@]}"
 
+# TODO: squeezing more memory, check each process in nvidia-smi, has different mem consumption, tweak params that way
