@@ -6,13 +6,13 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "setuptools>=79.0.1",
-    "flash-attn>=2.8.2",
     "sync>=1.0.0",
     "torch>=2.7.1",
     "uv>=0.8.10",
     "verl>=0.5.0",
     "vllm>=0.10.0",
     "wandb>=0.21.1",
+    "flash-attn>=2.8.2",
     "flashinfer-python>=0.2.11.post3",
 ]
 [tool.uv]
