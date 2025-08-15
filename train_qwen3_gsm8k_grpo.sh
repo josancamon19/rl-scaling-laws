@@ -61,7 +61,7 @@ ARGS=(
   trainer.n_gpus_per_node=2
   trainer.nnodes=1
   trainer.save_freq=10
-  trainer.test_freq=3
+  trainer.test_freq=4
   # dumb settings
   "data.train_files=${TRAIN_PARQUET}" 
   "actor_rollout_ref.model.path=${MODEL_PATH}"
@@ -75,7 +75,7 @@ ARGS=(
   data.train_batch_size=512 # gsm8k 7474 examples / this * epochs
   actor_rollout_ref.rollout.n=3 # batch_size generates n sized groups per prompt
   # we have now to process 256*3 to call optimizer.step()
-  actor_rollout_ref.actor.ppo_mini_batch_size=128 # .backward() called
+  actor_rollout_ref.actor.ppo_mini_batch_size=64 # .backward() called
   # each gpu process 1/n of mini batch_size ideally, then we call .backward()
   actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=32
   # making the log probs in parallel as well
