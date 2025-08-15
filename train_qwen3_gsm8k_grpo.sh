@@ -4,6 +4,7 @@ set -x
 
 # Parse command line arguments
 MODEL_SIZE="${1:-4B}" 
+# tried 1e-5, follows a very similar shape
 LEARNING_RATE="${2:-1e-6}"  # Default learning rate
 BATCH_SIZE="${3:-512}"  # Default batch size
 
@@ -126,7 +127,7 @@ ARGS=(
   "trainer.experiment_name=${EXPERIMENT_NAME}"
   # batch settings
   trainer.total_epochs=4 # passes over the datax
-  data.train_batch_size=${BATCH_SIZE} # gsm8k 7474 examples / this * epochs
+  data.train_batch_size=${BATCH_SIZE} # gsm8k 7474 examples / this * epochs, 512 by default
   actor_rollout_ref.rollout.n=3 # batch_size generates n sized groups per prompt
   # we have now to process batch_size*3 to be process before .step() is called
   actor_rollout_ref.actor.ppo_mini_batch_size=$((BATCH_SIZE / 4)) # .backward() called
@@ -139,7 +140,7 @@ ARGS=(
   data.max_prompt_length=512 # might cut a few prompts short
   data.max_response_length=512 # limit responses length to
 
-  actor_rollout_ref.actor.optim.lr=${LEARNING_RATE} # learning rate from command line
+  actor_rollout_ref.actor.optim.lr=${LEARNING_RATE} # 1e-6 default
   actor_rollout_ref.actor.use_kl_loss=True # enable kl penalty
   actor_rollout_ref.actor.kl_loss_coef=0.001 # kl beta coefficient
   actor_rollout_ref.actor.kl_loss_type=low_var_kl # kl estimation method

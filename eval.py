@@ -7,6 +7,7 @@ import torch
 from vllm import LLM
 import re
 from vllm.sampling_params import SamplingParams
+from verl.utils.reward_score.gsm8k import compute_score
 
 
 def create_mmlu_instruction(subject, question, choices):
@@ -67,33 +68,31 @@ def load_mmlu_csv(csv_path):
     return questions, choices, answers
 
 
+mmlu_prompt = """
+# Instruction
+Below is a list of conversations between a human and an AI assistant (you).
+Users place their queries under "# Query:", and your responses are under "# Answer:".
+You are a helpful, respectful, and honest assistant.
+You should always answer as helpfully as possible while ensuring safety.
+Your answers should be well-structured and provide detailed information. They should also have an engaging tone.
+Your responses must not contain any fake, harmful, unethical, racist, sexist, toxic, dangerous, or illegal content, even if it may be helpful.
+Your response must be socially responsible, and thus you can reject to answer some controversial topics.
+
+# Query:
+```{instruction}```
+
+# Answer:
+```
+"""
+
+
 def mmlu_baseline(
     model: str = "Qwen/Qwen3-0.6B-Base",
     data_dir: str = "data/mmlu/dev",
-    prompt_template_path: str = "zero_shot_system_prompt.prompt",
 ):
-    """
-    # Instruction
-    Below is a list of conversations between a human and an AI assistant (you).
-    Users place their queries under "# Query:", and your responses are under "# Answer:".
-    You are a helpful, respectful, and honest assistant.
-    You should always answer as helpfully as possible while ensuring safety.
-    Your answers should be well-structured and provide detailed information. They should also have an engaging tone.
-    Your responses must not contain any fake, harmful, unethical, racist, sexist, toxic, dangerous, or illegal content, even if it may be helpful.
-    Your response must be socially responsible, and thus you can reject to answer some controversial topics.
-
-    # Query:
-    ```{instruction}```
-
-    # Answer:
-    ```
-    """
     llm = LLM(model=model)
 
     # Load prompt template
-    with open(prompt_template_path, "r") as f:
-        prompt_template = f.read().strip()
-
     csv_files = glob.glob(os.path.join(data_dir, "*.csv"))
     all_results = {}
     total_correct = 0
@@ -111,7 +110,7 @@ def mmlu_baseline(
         prompts = []
         for question, choice_list in zip(questions, choices):
             instruction = create_mmlu_instruction(subject, question, choice_list)
-            prompt = prompt_template.format(instruction=instruction)
+            prompt = mmlu_prompt.format(instruction=instruction)
             prompts.append(prompt)
 
         # Generate responses
@@ -164,29 +163,10 @@ def mmlu_baseline(
 ### GSM8K ###
 
 
-def extract_final_number(response):
-    response = response.replace(",", "")
-    numbers = re.findall(r"-?\d+(?:\.\d+)?", response)
-    return numbers[-1] if numbers else None
-
-
 def evaluate_gsm8k_accuracy(predictions, ground_truths):
     """Evaluate GSM8K accuracy by comparing predicted numbers with ground truth"""
-    correct = 0
-    total = len(predictions)
-
-    for pred, gt in zip(predictions, ground_truths):
-        if (extracted := extract_final_number(pred)) is not None:
-            try:
-                pred_num = float(extracted)
-                gt_num = float(gt)
-                # print("pred:", pred[:50], "=", pred_num)
-                if abs(pred_num - gt_num) < 1e-6:
-                    correct += 1
-            except ValueError:
-                continue
-
-    return correct / total * 100 if total > 0 else 0
+    scores = [compute_score(pred, gt) for pred, gt in zip(predictions, ground_truths)]
+    return sum(scores) / len(predictions) * 100
 
 
 def load_gsm8k_jsonl(jsonl_path):
@@ -199,21 +179,20 @@ def load_gsm8k_jsonl(jsonl_path):
     return questions, answers
 
 
-def gsm8k_baseline(
-    model: str = "Qwen/Qwen3-0.6B-Base",
-    dataset_path: str = "data/gsm8k/test.jsonl",
-    sampling_temperature: float = 0.0,
-):
+def gsm8k_baseline(model: str = "Qwen/Qwen3-0.6B-Base"):
     llm = LLM(model=model)
-    questions, ground_truths = load_gsm8k_jsonl(dataset_path)
+    questions, ground_truths = load_gsm8k_jsonl("data/gsm8k/test.jsonl")
     print(f"Evaluating {len(questions)} GSM8K examples...")
 
     prompts = []
-    for question in questions:
-        prompt = f"{question}\nAnswer:"
-        prompts.append(prompt)
+    instruction_following = (
+        'Let\'s think step by step and output the final answer after "####".'
+    )
+    for question in questions:  # [:100]:
+        question += " " + instruction_following
+        prompts.append(question)
 
-    sampling_params = SamplingParams(temperature=sampling_temperature, max_tokens=512)
+    sampling_params = SamplingParams(temperature=1.0, max_tokens=512)
     outputs = llm.generate(prompts, sampling_params)
     responses = [output.outputs[0].text for output in outputs]
 
@@ -225,7 +204,6 @@ def gsm8k_baseline(
     print("GSM8K EVALUATION RESULTS")
     print(f"{'=' * 60}")
     print(f"Model: {model}")
-    print(f"Dataset: {dataset_path}")
     print(f"Total examples: {len(ground_truths)}")
     print(f"Correct: {correct_count}")
     print(f"Accuracy: {accuracy:.2f}%")
@@ -233,7 +211,6 @@ def gsm8k_baseline(
 
     return {
         "model": model,
-        "dataset": dataset_path,
         "accuracy": accuracy,
         "correct": correct_count,
         "total": len(ground_truths),
@@ -242,18 +219,15 @@ def gsm8k_baseline(
     }
 
 
-def cleanup_vllm_model():
-    """Clean up VLLM models to free GPU memory"""
-    gc.collect()
-    torch.cuda.empty_cache()
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-
-
 if __name__ == "__main__":
     # Run evaluations
-    print("Running MMLU baseline...")
-    mmlu_results = mmlu_baseline()
+    # print("Running MMLU baseline...")
+    # mmlu_results = mmlu_baseline()
 
     print("Running GSM8K baseline...")
-    gsm8k_results = gsm8k_baseline()
+    # gsm8k_results = gsm8k_baseline(
+    #     "checkpoints/verl_grpo_gsm8k/qwen3_1.7b_grpo/merged_model"
+    # )
+    gsm8k_results = gsm8k_baseline(
+        "josancamon/qwen3-0.6b-grpo-gsm8k"
+    )
