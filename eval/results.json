@@ -1,0 +1,137 @@
+{
+  "temperature": 0.0,
+  "shots": [
+    0
+  ],
+  "mmlu_split": "test",
+  "gsm8k_split": "test",
+  "models": [
+    {
+      "model": "Qwen/Qwen3-0.6B-base",
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 41.333143426862264,
+              "correct": 5804,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 0.0,
+              "correct": 0,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755384139,
+      "ended_at": 1755384202
+    },
+    {
+      "model": "Qwen/Qwen3-1.7B-base",
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 41.874376869391824,
+              "correct": 5880,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 0.22744503411675512,
+              "correct": 3,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755384202,
+      "ended_at": 1755384273
+    },
+    {
+      "model": "Qwen/Qwen3-4B-base",
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 64.47087309500071,
+              "correct": 9053,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 66.41394996209249,
+              "correct": 875,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755384273,
+      "ended_at": 1755384443
+    },
+    {
+      "model": "Qwen/Qwen3-8B-base",
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 66.6999002991027,
+              "correct": 9366,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 71.79681576952237,
+              "correct": 947,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755384443,
+      "ended_at": 1755384730
+    },
+    {
+      "model": "Qwen/Qwen3-14B-base",
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 69.74789915966386,
+              "correct": 9794,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 74.90523123578468,
+              "correct": 988,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755384730,
+      "ended_at": 1755385331
+    }
+  ],
+  "started_at": 1755384139,
+  "ended_at": 1755385331
+}

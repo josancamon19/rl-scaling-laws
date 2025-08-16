@@ -4,6 +4,7 @@ from vllm import LLM
 from vllm.sampling_params import SamplingParams
 from datasets import load_dataset
 
+# TODO: Evaluate as well by checking log probs of the correct letter.
 
 def extract_answer_letter(response):
     """Extract the answer letter from the model response"""

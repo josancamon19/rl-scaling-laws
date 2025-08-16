@@ -14,6 +14,7 @@ dependencies = [
     "wandb>=0.21.1",
     "flash-attn>=2.8.2",
     "flashinfer-python>=0.2.11.post3",
+    "matplotlib>=3.10.5",
 ]
 [tool.uv]
 no-build-isolation-package = ["flash-attn"]
