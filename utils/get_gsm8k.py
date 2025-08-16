@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
+https://github.com/volcengine/verl/blob/main/examples/data_preprocess/gsm8k.py
 Preprocess the GSM8k dataset to parquet format
 """
 
 import argparse
 import os
 import re
-
 import datasets
 
-from verl.utils.hdfs_io import copy, makedirs
 
 
 def extract_solution(solution_str):
@@ -34,14 +33,13 @@ def extract_solution(solution_str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_dir", default="data/gsm8k")
-    parser.add_argument("--hdfs_dir", default=None)
+    parser.add_argument("--local_dir", default="./data/gsm8k")
 
     args = parser.parse_args()
 
-    data_source = "data/gsm8k"
+    data_source = "openai/gsm8k"
 
-    dataset = datasets.load_dataset(data_source)
+    dataset = datasets.load_dataset(data_source, "main")
 
     train_dataset = dataset["train"]
     test_dataset = dataset["test"]

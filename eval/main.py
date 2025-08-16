@@ -12,14 +12,14 @@ from eval.gsm8k import run_gsm8k_evaluation
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("model", type=str)
+    parser.add_argument("--model", type=str, default="Qwen/Qwen3-0.6B-base")
     args = parser.parse_args()
 
     print(f"Evaluating model: {args.model}")
     print("=" * 60)
 
-    run_mmlu_evaluation(args.model, split="test")
-    run_gsm8k_evaluation(args.model, split="validation")
+    run_mmlu_evaluation(args.model)
+    run_gsm8k_evaluation(args.model)
 
 
 if __name__ == "__main__":

@@ -10,12 +10,12 @@ def evaluate_gsm8k_accuracy(predictions, ground_truths):
     return sum(scores) / len(predictions) * 100
 
 
-def run_gsm8k_evaluation(model: str, split: str = "validation"):
+def run_gsm8k_evaluation(model: str, split: str = "test"):
     """Run GSM8K evaluation on the specified model using HuggingFace datasets
     
     Args:
         model: Model path or HuggingFace model identifier
-        split: Which split to use ("validation" or "train")
+        split: Which split to use ("test" or "train")
     """
     llm = LLM(model=model)
     

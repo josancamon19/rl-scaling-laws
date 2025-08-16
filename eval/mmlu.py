@@ -56,7 +56,7 @@ Your response must be socially responsible, and thus you can reject to answer so
 """
 
 
-def run_mmlu_evaluation(model: str, split: str = "validation"):
+def run_mmlu_evaluation(model: str, split: str = "test"):
     """Run MMLU evaluation on the specified model using HuggingFace datasets
     
     Args:
