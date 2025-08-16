@@ -11,3 +11,4 @@ wheels/
 outputs
 wandb
 checkpoints
+data/
