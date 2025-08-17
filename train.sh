@@ -38,7 +38,7 @@ MODEL_NAME="${MODEL_NAME//./_}"  # Replace . with _
 
 PROJECT_NAME="${PROJECT_NAME:-verl_grpo_gsm8k}"
 EXPERIMENT_NAME="${EXPERIMENT_NAME:-${MODEL_NAME}_grpo_lr${LEARNING_RATE}_bs${BATCH_SIZE}}" 
-export HF_HOME="${HF_HOME:-/tmp/huggingface}"
+export HF_HOME="${HF_HOME:-/workspace/.hf_home}"
 
 echo "Training configuration:"
 echo "  Model: ${MODEL_PATH}"
@@ -56,6 +56,8 @@ echo "  Experiment: ${EXPERIMENT_NAME}"
   unset HF_HUB_OFFLINE
   unset TRANSFORMERS_OFFLINE  
   unset HF_DATASETS_OFFLINE 
+  unset VLLM_USE_MODELSCOPE
+  unset HF_HUB_DISABLE_TELEMETRY
     python3 -c "
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from huggingface_hub import snapshot_download
@@ -97,6 +99,7 @@ export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
 export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
 export VLLM_USE_MODELSCOPE=false  # Prevent VLLM from checking ModelScope
 export HF_HUB_DISABLE_TELEMETRY=1  # Disable telemetry to reduce connections
+export VLLM_SKIP_TOKENIZER_DOWNLOAD=1  # Prevent vLLM from trying to download additional files
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
