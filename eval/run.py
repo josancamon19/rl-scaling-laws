@@ -21,28 +21,33 @@ from huggingface_hub import HfApi
 
 def get_available_grpo_checkpoints(repo_id: str) -> List[Dict[str, str]]:
     api = HfApi()
-    commits = list(api.list_repo_commits(repo_id, repo_type="model"))
-    global_step_commits = []
-    for commit in commits:
-        message = commit.title
-        if "global_step_" in message:
-            match = re.search(r"global_step_(\d+)", message)
+    try:
+        refs = api.list_repo_refs(repo_id, repo_type="model")
+        branches = [ref.ref.replace("refs/heads/", "") for ref in refs.branches]
+    except Exception as e:
+        print(f"Error listing branches for {repo_id}: {e}")
+        return []
+    
+    global_step_branches = []
+    for branch in branches:
+        # Look for branches named like "global-step-100"
+        if "global-step-" in branch:
+            match = re.search(r"global-step-(\d+)", branch)
             if match:
                 step_num = int(match.group(1))
-                global_step_commits.append(
+                global_step_branches.append(
                     {
                         "step": step_num,
-                        "commit_id": commit.commit_id,
-                        "message": message,
+                        "branch": branch,
                         "checkpoint_name": f"global_step_{step_num}",
                     }
                 )
 
     # Sort by step number
-    global_step_commits.sort(key=lambda x: x["step"])
+    global_step_branches.sort(key=lambda x: x["step"])
 
-    print(f"Found {len(global_step_commits)} GRPO checkpoints for {repo_id}")
-    return global_step_commits
+    print(f"Found {len(global_step_branches)} GRPO checkpoints for {repo_id}")
+    return global_step_branches
 
 
 def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
@@ -55,22 +60,22 @@ def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
 
     api = HfApi()
     try:
-        commits = list(api.list_repo_commits(repo_id, repo_type="model"))
+        refs = api.list_repo_refs(repo_id, repo_type="model")
+        branches = [ref.ref.replace("refs/heads/", "") for ref in refs.branches]
     except:  # noqa: E722
         return []
 
     checkpoints = []
-    for commit in commits:
-        message = commit.title
-        if "global_step_" in message:
-            match = re.search(r"global_step_(\d+)", message)
+    for branch in branches:
+        # Look for branches named like "global-step-100"
+        if "global-step-" in branch:
+            match = re.search(r"global-step-(\d+)", branch)
             if match:
                 step_num = int(match.group(1))
                 checkpoints.append(
                     {
                         "step": step_num,
-                        "commit_id": commit.commit_id,
-                        "message": message,
+                        "branch": branch,
                         "checkpoint_name": f"global_step_{step_num}",
                     }
                 )
@@ -85,7 +90,7 @@ def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
                 "model_id": repo_id,
                 "checkpoint": checkpoint_info["checkpoint_name"],
                 "base_model": base_model,
-                "revision": checkpoint_info["commit_id"],  # Use commit ID as revision
+                "revision": checkpoint_info["branch"],  # Use branch name as revision
                 "step": checkpoint_info["step"],
             }
         )

@@ -14,9 +14,9 @@ if [ ! -x "$PYTHON_BIN" ]; then
     fi
 fi
 
-# Script to upload models to HuggingFace
-# Usage: ./upload_to_hf.sh <model_size> [repo_name]
-# Example: ./upload_to_hf.sh 0.6b my-qwen3-0.6b-grpo
+# Script to upload models to HuggingFace as branches
+# Usage: ./upload_to_hf_branches.sh <model_size> [repo_name]
+# Example: ./upload_to_hf_branches.sh 0.6b my-qwen3-0.6b-grpo
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <model_size> [repo_name]"
@@ -119,10 +119,9 @@ fi
 MODEL_BASE_PATH=$(ls -td "${CANDIDATES[@]}" 2>/dev/null | head -n 1)
 
 MERGED_MODELS_DIR="$MODEL_BASE_PATH/merged_models"
-SINGLE_MERGED_PATH="$MODEL_BASE_PATH/merged_model"
 
 echo "============================================"
-echo "Uploading model to HuggingFace"
+echo "Uploading model to HuggingFace as branches"
 echo "============================================"
 echo "Model size: $MODEL_SIZE"
 echo "Model base: $MODEL_BASE_PATH"
@@ -132,7 +131,6 @@ echo ""
 # Export env for embedded python blocks
 export FULL_REPO_NAME
 export MERGED_MODELS_DIR
-export SINGLE_MERGED_PATH
 
 # Check if user is logged in to HuggingFace
 echo "Checking HuggingFace authentication..."
@@ -151,7 +149,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Upload models per step (multi) or single fallback
+# Upload models per step as branches
 echo ""
 echo "Starting upload..."
 "$PYTHON_BIN" - <<'PYCODE'
@@ -160,7 +158,6 @@ from huggingface_hub import HfApi, upload_folder
 
 repo_name = os.environ['FULL_REPO_NAME']
 merged_models_dir = os.environ['MERGED_MODELS_DIR']
-single_merged_path = os.environ['SINGLE_MERGED_PATH']
 
 def has_model_files(path: str) -> bool:
     return os.path.isfile(os.path.join(path, 'model.safetensors')) or \
@@ -170,32 +167,51 @@ api = HfApi()
 print('Creating/updating repository: {}'.format(repo_name))
 api.create_repo(repo_id=repo_name, exist_ok=True, private=False)
 
-step_dirs = []
-if os.path.isdir(merged_models_dir):
-    for name in sorted(os.listdir(merged_models_dir)):
-        local_path = os.path.join(merged_models_dir, name)
-        if os.path.isdir(local_path) and has_model_files(local_path):
-            step_dirs.append((name, local_path))
+if not os.path.isdir(merged_models_dir):
+    raise RuntimeError('No merged models directory found. Please run ./scripts/verl_to_hf.sh first.')
 
-# Fallback to single merged_model
-if not step_dirs and os.path.isdir(single_merged_path) and has_model_files(single_merged_path):
-    step_dirs.append(('merged_model', single_merged_path))
+step_dirs = []
+for name in sorted(os.listdir(merged_models_dir)):
+    local_path = os.path.join(merged_models_dir, name)
+    if os.path.isdir(local_path) and has_model_files(local_path):
+        step_dirs.append((name, local_path))
 
 if not step_dirs:
-    raise RuntimeError('No merged models found. Please run ./scripts/verl_to_hf.sh first.')
+    raise RuntimeError('No merged models found in {}. Please run ./scripts/verl_to_hf.sh first.'.format(merged_models_dir))
 
+# Upload main branch first (latest checkpoint)
+latest_step_name, latest_step_path = step_dirs[-1]
+print('Uploading latest step {} to main branch...'.format(latest_step_name))
+upload_folder(
+    folder_path=latest_step_path,
+    repo_id=repo_name,
+    repo_type='model',
+    commit_message='Upload latest GRPO model ({})'.format(latest_step_name)
+)
+print('✓ Uploaded {} to main branch'.format(latest_step_name))
+
+# Upload each step as a separate branch
 for step_name, local_path in step_dirs:
-    print('Uploading step {} from {} → {}/{} ...'.format(step_name, local_path, repo_name, step_name))
-    upload_folder(
-        folder_path=local_path,
-        repo_id=repo_name,
-        repo_type='model',
-        path_in_repo=step_name,
-        commit_message='Upload GRPO model for {}'.format(step_name)
-    )
-    print('✓ Uploaded {}'.format(step_name))
+    branch_name = step_name.replace('_', '-')  # HF branches prefer hyphens
+    print('Uploading {} to branch {} ...'.format(step_name, branch_name))
+    
+    try:
+        # Create branch and upload
+        api.create_branch(repo_id=repo_name, branch=branch_name, exist_ok=True)
+        upload_folder(
+            folder_path=local_path,
+            repo_id=repo_name,
+            repo_type='model',
+            revision=branch_name,
+            commit_message='Upload GRPO model checkpoint {}'.format(step_name)
+        )
+        print('✓ Uploaded {} to branch {}'.format(step_name, branch_name))
+    except Exception as e:
+        print('Warning: Failed to upload {} to branch {}: {}'.format(step_name, branch_name, e))
 
-print('✓ All steps uploaded to: https://huggingface.co/{}'.format(repo_name))
+print('\n✓ All steps uploaded to: https://huggingface.co/{}'.format(repo_name))
+print('\nTo load a specific checkpoint:')
+print('  model = AutoModelForCausalLM.from_pretrained("{}", revision="global-step-100")'.format(repo_name))
 PYCODE
 
 if [ $? -eq 0 ]; then

@@ -134,7 +134,7 @@ ARGS=(
   actor_rollout_ref.rollout.n=3 # batch_size generates n sized groups per prompt
   # we have now to process batch_size*3 to be process before .step() is called
   # actor_rollout_ref.actor.ppo_mini_batch_size=$((BATCH_SIZE / 4)) # .backward() called
-  actor_rollout_ref.actor.ppo_mini_batch_size=256
+  actor_rollout_ref.actor.ppo_mini_batch_size=512
   # each gpu process 1/n of mini batch_size ideally, then we call .backward()
   # for 8B 6 size, is using 85GB peak/95GB, with no grad checkpoint, 8 is using 42GB with grad cheeckpointing
   # takes half the time, try 16, and 64 for size_per_gpu now, 16 45GB wtf, nothing, 32 takes 56GB, going 64, only 65GB
