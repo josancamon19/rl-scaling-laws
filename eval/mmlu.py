@@ -108,6 +108,7 @@ def run_mmlu_evaluation(
     prompt_type: PromptType | str = PromptType.zero_shot,
     temperature: float = 1.0,
     revision: str = None,
+    llm: LLM = None,
 ):
     """Run MMLU evaluation on the specified model using HuggingFace datasets
 
@@ -115,12 +116,14 @@ def run_mmlu_evaluation(
         model: Model path or HuggingFace model identifier
         split: Which HuggingFace split to use ("validation", "test", "dev")
         revision: Specific model revision/branch to use (for HuggingFace models)
+        llm: Optional LLM instance to use. If None, creates a new one.
     """
-    # Initialize LLM with revision if provided
-    llm_kwargs = {"model": model}
-    if revision:
-        llm_kwargs["revision"] = revision
-    llm = LLM(**llm_kwargs)
+    # Initialize LLM with revision if provided (only if llm not passed)
+    if llm is None:
+        llm_kwargs = {"model": model}
+        if revision:
+            llm_kwargs["revision"] = revision
+        llm = LLM(**llm_kwargs)
 
     print(f"Loading MMLU dataset from HuggingFace (split: {split})...")
     dataset = load_dataset("cais/mmlu", "all", split=split)

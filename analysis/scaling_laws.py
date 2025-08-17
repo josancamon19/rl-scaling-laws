@@ -8,6 +8,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def estimate_training_flops(model_params_B, batch_size=512, rollout_n=3, seq_len=512):
+    N = model_params_B * 1e9  # Convert to actual parameters
+    total_sequences = batch_size * rollout_n  # 1,536
+    total_tokens = total_sequences * seq_len
+    rollout_flops = 2 * N * (batch_size * rollout_n * 512)
+    ref_logprob_flops = 2 * N * total_tokens
+    actor_logprob_flops = 2 * N * total_tokens
+    training_flops = 6 * N * total_tokens
+    return rollout_flops + ref_logprob_flops + actor_logprob_flops + training_flops
+
+
 QWEN3_BASE_PARAMS_N: Dict[str, float] = {
     "Qwen/Qwen3-14B-base": 13.2e9,
     "Qwen/Qwen3-8B-base": 6.95e9,
@@ -325,32 +336,25 @@ def main() -> None:
     benchmarks_json = repo_root / "results" / "benchmarks.json"
     val_losses_json = repo_root / "results" / "val_losses.json"
 
-    # Benchmark accuracy plots
-    if benchmarks_json.exists():
-        for benchmark in ["gsm8k", "mmlu"]:
-            try:
-                shots = discover_available_shots(benchmarks_json, benchmark)
-            except Exception as e:
-                print(f"Failed to read shots from {benchmarks_json}: {e}")
-                shots = []
-            if not shots:
-                continue
-            for x_axis in ["params"]:
-                shots_part = "shots-" + "-".join(str(k) for k in shots)
-                fname = f"{benchmarks_json.stem}_{benchmark}_{x_axis}_{shots_part}.png"
-                save_path = out_dir / fname
-                plot_scaling(
-                    results_path=benchmarks_json,
-                    benchmark=benchmark,
-                    shots=shots,
-                    x_axis=x_axis,
-                    save_path=save_path,
-                )
-    else:
-        print(
-            f"No benchmark accuracy file found at {benchmarks_json}; skipping accuracy plots."
-        )
-
+    for benchmark in ["gsm8k", "mmlu"]:
+        try:
+            shots = discover_available_shots(benchmarks_json, benchmark)
+        except Exception as e:
+            print(f"Failed to read shots from {benchmarks_json}: {e}")
+            shots = []
+        if not shots:
+            continue
+        for x_axis in ["params"]:
+            shots_part = "shots-" + "-".join(str(k) for k in shots)
+            fname = f"{benchmarks_json.stem}_{benchmark}_{x_axis}_{shots_part}.png"
+            save_path = out_dir / fname
+            plot_scaling(
+                results_path=benchmarks_json,
+                benchmark=benchmark,
+                shots=shots,
+                x_axis=x_axis,
+                save_path=save_path,
+            )
     # Validation loss/perplexity plots
     if val_losses_json.exists():
         for metric in ["loss"]:  # "perplexity"

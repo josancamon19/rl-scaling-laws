@@ -63,6 +63,7 @@ def run_gsm8k_evaluation(
     prompt_type: PromptType = PromptType.zero_shot,
     temperature: float = 1.0,
     revision: str = None,
+    llm: LLM = None,
 ):
     """Run GSM8K evaluation on the specified model using HuggingFace datasets
 
@@ -71,12 +72,14 @@ def run_gsm8k_evaluation(
         split: Which split to use ("test" or "train")
         prompt_type: Prompt construction style: zero_shot, one_shot, two_shot, ...
         revision: Specific model revision/branch to use (for HuggingFace models)
+        llm: Optional LLM instance to use. If None, creates a new one.
     """
-    # Initialize LLM with revision if provided
-    llm_kwargs = {"model": model}
-    if revision:
-        llm_kwargs["revision"] = revision
-    llm = LLM(**llm_kwargs)
+    # Initialize LLM with revision if provided (only if llm not passed)
+    if llm is None:
+        llm_kwargs = {"model": model}
+        if revision:
+            llm_kwargs["revision"] = revision
+        llm = LLM(**llm_kwargs)
 
     print(f"Loading GSM8K dataset from HuggingFace (split: {split})...")
     dataset = load_dataset("openai/gsm8k", "main", split=split)

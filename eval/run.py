@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from eval.mmlu import run_mmlu_evaluation, PromptType as MMLUPromptType
 from eval.gsm8k import run_gsm8k_evaluation, PromptType as GSM8KPromptType
+from vllm import LLM
 
 
 import re
@@ -92,6 +93,54 @@ def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
     return variants
 
 
+### ===== HELPER FUNCTIONS
+
+
+def _load_existing_results(output_path: Path) -> dict:
+    if not output_path.exists():
+        return None
+    with output_path.open("r") as f:
+        return json.load(f)
+
+
+def _save_results(results: dict, output_path: Path):
+    """Save results to JSON file"""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w") as f:
+        json.dump(results, f, indent=2)
+    print(f"Saved results to {output_path}")
+
+
+def _model_already_evaluated(
+    model_name: str, existing_results: dict, shots: list
+) -> bool:
+    """Check if a model has already been evaluated for all required shots"""
+    if not existing_results or "models" not in existing_results:
+        return False
+
+    for model_result in existing_results["models"]:
+        if model_result.get("model") == model_name:
+            # Check if all required shots are present
+            mmlu_shots = (
+                model_result.get("benchmarks", {}).get("mmlu", {}).get("by_shot", {})
+            )
+            gsm8k_shots = (
+                model_result.get("benchmarks", {}).get("gsm8k", {}).get("by_shot", {})
+            )
+
+            for shot in shots:
+                shot_str = str(shot)
+                if (
+                    shot_str not in mmlu_shots
+                    or shot_str not in gsm8k_shots
+                    or "error" in mmlu_shots.get(shot_str, {})
+                    or "error" in gsm8k_shots.get(shot_str, {})
+                ):
+                    return False
+            return True
+    return False
+
+
 ### ===== STARTS
 
 
@@ -110,10 +159,10 @@ def _prompt_type_from_num(enum_cls, k: int):
 def _default_models():
     return [
         "Qwen/Qwen3-0.6B-base",
-        "Qwen/Qwen3-1.7B-base",
-        "Qwen/Qwen3-4B-base",
-        "Qwen/Qwen3-8B-base",
-        "Qwen/Qwen3-14B-base",
+        # "Qwen/Qwen3-1.7B-base",
+        # "Qwen/Qwen3-4B-base",
+        # "Qwen/Qwen3-8B-base",
+        # "Qwen/Qwen3-14B-base",
     ]
 
 
@@ -168,17 +217,30 @@ logging.getLogger("vllm").setLevel(logging.ERROR)
 def main():
     parser = argparse.ArgumentParser(description="Run benchmarks on language models")
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--shots", nargs="*", type=int, default=[0, 1, 2, 3, 4, 5])
+    parser.add_argument("--shots", nargs="*", type=int, default=[0])  # , 1, 2, 3, 4, 5
     args = parser.parse_args()
 
-    results = {
-        "temperature": args.temperature,
-        "shots": args.shots,
-        "mmlu_split": "test",
-        "gsm8k_split": "test",
-        "models": [],
-        "started_at": int(time.time()),
-    }
+    output_path = Path(str(Path(__file__).parent / "results.json"))
+
+    # Load existing results if they exist
+    existing_results = _load_existing_results(output_path)
+
+    if existing_results:
+        print(f"Loading existing results from {output_path}")
+        results = existing_results
+        # Update with current run parameters if needed
+        results["temperature"] = args.temperature
+        results["shots"] = args.shots
+    else:
+        print("Starting fresh evaluation")
+        results = {
+            "temperature": args.temperature,
+            "shots": args.shots,
+            "mmlu_split": "test",
+            "gsm8k_split": "test",
+            "models": [],
+            "started_at": int(time.time()),
+        }
 
     model_list = _build_model_list(
         include_grpo=True,
@@ -186,6 +248,8 @@ def main():
         grpo_username="josancamon",
         max_grpo_checkpoints=None,
     )
+
+    model_list = model_list[1:2]
 
     for model_item in model_list:
         # Handle both simple string models and complex model entries
@@ -204,6 +268,11 @@ def main():
                 "revision": revision,
             }
 
+        # Skip if model already evaluated
+        if _model_already_evaluated(model_name, existing_results, args.shots):
+            print(f"Skipping {model_name} - already evaluated")
+            continue
+
         print(f"Evaluating model: {model_name}")
         if revision:
             print(f"  Using revision: {revision}")
@@ -221,32 +290,33 @@ def main():
 
         for k in args.shots:
             # MMLU
-            try:
-                mmlu_pt = _prompt_type_from_num(MMLUPromptType, k)
-                mmlu_res = run_mmlu_evaluation(
-                    model_id,
-                    split="test",
-                    prompt_type=mmlu_pt,
-                    temperature=args.temperature,
-                    revision=revision,
-                )
-                # Aggregate overall accuracy
-                total_correct = sum(v["correct"] for v in mmlu_res.values())
-                total_questions = sum(v["total"] for v in mmlu_res.values())
-                overall_acc = (
-                    (total_correct / total_questions * 100)
-                    if total_questions > 0
-                    else 0.0
-                )
-                model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
-                    "accuracy": overall_acc,
-                    "correct": total_correct,
-                    "total": total_questions,
-                }
-            except Exception as e:
-                model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
-                    "error": str(e)
-                }
+            # try:
+            #     mmlu_pt = _prompt_type_from_num(MMLUPromptType, k)
+            #     mmlu_res = run_mmlu_evaluation(  # TODO: MMLU should generate everything at the same time
+            #         model_id,
+            #         split="test",
+            #         prompt_type=mmlu_pt,
+            #         temperature=args.temperature,
+            #         revision=revision,
+            #         # llm=llm,
+            #     )
+            #     # Aggregate overall accuracy
+            #     total_correct = sum(v["correct"] for v in mmlu_res.values())
+            #     total_questions = sum(v["total"] for v in mmlu_res.values())
+            #     overall_acc = (
+            #         (total_correct / total_questions * 100)
+            #         if total_questions > 0
+            #         else 0.0
+            #     )
+            #     model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
+            #         "accuracy": overall_acc,
+            #         "correct": total_correct,
+            #         "total": total_questions,
+            #     }
+            # except Exception as e:
+            #     model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
+            #         "error": str(e)
+            #     }
 
             # GSM8K
             try:
@@ -257,6 +327,7 @@ def main():
                     prompt_type=gsm_pt,
                     temperature=args.temperature,
                     revision=revision,
+                    # llm=llm,
                 )
                 model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
                     "accuracy": gsm_res.get("accuracy"),
@@ -269,16 +340,19 @@ def main():
                 }
 
         model_result["ended_at"] = int(time.time())
+
+        # Remove any existing result for this model before adding the new one
+        results["models"] = [
+            m for m in results["models"] if m.get("model") != model_name
+        ]
         results["models"].append(model_result)
 
+        # Save results after each model
+        _save_results(results, output_path)
+
     results["ended_at"] = int(time.time())
-
-    output_path = Path(str(Path(__file__).parent / "results.json"))
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w") as f:
-        json.dump(results, f, indent=2)
-
-    print(f"Wrote results to {output_path}")
+    _save_results(results, output_path)
+    print("Evaluation completed!")
 
 
 if __name__ == "__main__":
