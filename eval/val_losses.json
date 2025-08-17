@@ -1,0 +1,57 @@
+[
+  {
+    "model": "Qwen/Qwen3-0.6B-base",
+    "dataset": "mindchain/wikitext2",
+    "split": "wikitext-2-raw-v1/validation",
+    "block_size": 1024,
+    "batch_size": 2,
+    "loss": 2.6950942550118513,
+    "perplexity": 14.806914313401515,
+    "num_batches": 127,
+    "tokens_evaluated": 259842
+  },
+  {
+    "model": "Qwen/Qwen3-1.7B-base",
+    "dataset": "mindchain/wikitext2",
+    "split": "wikitext-2-raw-v1/validation",
+    "block_size": 1024,
+    "batch_size": 2,
+    "loss": 2.384401357080054,
+    "perplexity": 10.852563909349998,
+    "num_batches": 127,
+    "tokens_evaluated": 259842
+  },
+  {
+    "model": "Qwen/Qwen3-4B-base",
+    "dataset": "mindchain/wikitext2",
+    "split": "wikitext-2-raw-v1/validation",
+    "block_size": 1024,
+    "batch_size": 2,
+    "loss": 2.198885404218839,
+    "perplexity": 9.014959861374837,
+    "num_batches": 127,
+    "tokens_evaluated": 259842
+  },
+  {
+    "model": "Qwen/Qwen3-8B-base",
+    "dataset": "mindchain/wikitext2",
+    "split": "wikitext-2-raw-v1/validation",
+    "block_size": 1024,
+    "batch_size": 2,
+    "loss": 2.080022930160282,
+    "perplexity": 8.00465246015589,
+    "num_batches": 127,
+    "tokens_evaluated": 259842
+  },
+  {
+    "model": "Qwen/Qwen3-14B-base",
+    "dataset": "mindchain/wikitext2",
+    "split": "wikitext-2-raw-v1/validation",
+    "block_size": 1024,
+    "batch_size": 2,
+    "loss": 1.9813390632314005,
+    "perplexity": 7.252447972332507,
+    "num_batches": 127,
+    "tokens_evaluated": 259842
+  }
+]
