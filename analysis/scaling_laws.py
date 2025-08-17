@@ -257,10 +257,12 @@ def plot_val_scaling(
     # If requested and plotting vs params, project the loss at target parameter size
     if target_params_b is not None and x_axis == "params":
         x_target = float(target_params_b) * 1e9
-        y_target = A * (x_target ** alpha)
+        y_target = A * (x_target**alpha)
         guide_color = "teal"
         plt.axvline(x=x_target, color=guide_color, linewidth=1.2)
-        plt.scatter([x_target], [y_target], color=guide_color, marker="*", s=80, zorder=5)
+        plt.scatter(
+            [x_target], [y_target], color=guide_color, marker="*", s=80, zorder=5
+        )
         plt.annotate(
             f"{target_params_b:.1f}B → {y_metric}≈{y_target:.3f}",
             (x_target, y_target),
@@ -333,7 +335,7 @@ def main() -> None:
                 shots = []
             if not shots:
                 continue
-            for x_axis in ["flops"]:  # "params",
+            for x_axis in ["params"]:
                 shots_part = "shots-" + "-".join(str(k) for k in shots)
                 fname = f"{benchmarks_json.stem}_{benchmark}_{x_axis}_{shots_part}.png"
                 save_path = out_dir / fname

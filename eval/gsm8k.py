@@ -62,6 +62,7 @@ def run_gsm8k_evaluation(
     split: str = "test",
     prompt_type: PromptType = PromptType.zero_shot,
     temperature: float = 1.0,
+    revision: str = None,
 ):
     """Run GSM8K evaluation on the specified model using HuggingFace datasets
 
@@ -69,8 +70,13 @@ def run_gsm8k_evaluation(
         model: Model path or HuggingFace model identifier
         split: Which split to use ("test" or "train")
         prompt_type: Prompt construction style: zero_shot, one_shot, two_shot, ...
+        revision: Specific model revision/branch to use (for HuggingFace models)
     """
-    llm = LLM(model=model)
+    # Initialize LLM with revision if provided
+    llm_kwargs = {"model": model}
+    if revision:
+        llm_kwargs["revision"] = revision
+    llm = LLM(**llm_kwargs)
 
     print(f"Loading GSM8K dataset from HuggingFace (split: {split})...")
     dataset = load_dataset("openai/gsm8k", "main", split=split)
@@ -96,17 +102,17 @@ def run_gsm8k_evaluation(
         if num_shots == 0:
             prompts.append(f"{question} {instruction_following}")
         else:
-            prompt = f"{few_shot_prefix}Q: {question} {instruction_following}\nA:"
+            prompt = f"{few_shot_prefix}Q: {question} {instruction_following}\nA: "
             prompts.append(prompt)
 
-    print(f"Prompt Example [0]:\n{prompts[0]}")
-    print(f"Ground Truth [0]:\n{ground_truths[0]}")
+    # print(f"Prompt Example [0]:\n{prompts[0]}")
+    # print(f"Expected GT [0]:\n{ground_truths[0]}")
 
     sampling_params = SamplingParams(temperature=temperature, max_tokens=512)
     outputs = llm.generate(prompts, sampling_params)
     responses = [output.outputs[0].text for output in outputs]
 
-    print(f"Response Example [0]:\n{responses[0]}")
+    # print(f"Response Example [0]: {responses[0]}")
 
     accuracy = evaluate_gsm8k_accuracy(responses, ground_truths)
     correct_count = int(accuracy * len(ground_truths) / 100)

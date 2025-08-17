@@ -14,3 +14,4 @@ checkpoints
 data/
 results/*.png
 results/scaling_laws/
+eval/results.json
