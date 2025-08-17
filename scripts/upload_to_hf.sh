@@ -1,10 +1,24 @@
 #!/bin/bash
 
+set -euo pipefail
+
+# Resolve repo root and python
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
+if [ ! -x "$PYTHON_BIN" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+        PYTHON_BIN="python3"
+    else
+        PYTHON_BIN="python"
+    fi
+fi
+
 # Script to upload models to HuggingFace
 # Usage: ./upload_to_hf.sh <model_size> [repo_name]
 # Example: ./upload_to_hf.sh 0.6b my-qwen3-0.6b-grpo
 
-if [ $# -eq 0 ]; then
+if [ $# -lt 1 ]; then
     echo "Usage: $0 <model_size> [repo_name]"
     echo ""
     echo "Available model sizes:"
@@ -21,7 +35,7 @@ if [ $# -eq 0 ]; then
 fi
 
 MODEL_SIZE="$1"
-REPO_NAME="$2"
+REPO_NAME="${2-}"
 
 # Map model size to directory name
 case "$MODEL_SIZE" in
@@ -58,7 +72,7 @@ if [ -z "$REPO_NAME" ]; then
 fi
 
 # Get HuggingFace username and create full repo path
-HF_USERNAME=$(.venv/bin/python -c "
+HF_USERNAME=$("$PYTHON_BIN" -c "
 from huggingface_hub import whoami
 try:
     user_info = whoami()
@@ -76,81 +90,113 @@ fi
 # Create full repo path with username
 FULL_REPO_NAME="$HF_USERNAME/$REPO_NAME"
 
-# Define paths
-BASE_DIR="checkpoints/verl_grpo_gsm8k"
-MODEL_PATH="$BASE_DIR/$MODEL_DIR/merged_model"
+# Define base dir and auto-detect actual model directory by size token
+BASE_DIR="$REPO_ROOT/checkpoints/verl_grpo_gsm8k"
+SIZE_TOKEN_DOT="$MODEL_SIZE"
+SIZE_TOKEN_US="${MODEL_SIZE/./_}"
 
-# Check if merged model exists
-if [ ! -d "$MODEL_PATH" ]; then
-    echo "Error: Merged model not found at $MODEL_PATH"
-    echo "Please run ./verl_to_hf.sh first to merge the model"
+# Gather candidate dirs
+CANDIDATES=()
+for d in "$BASE_DIR"/*; do
+    if [ -d "$d" ]; then
+        name="$(basename "$d")"
+        case "$name" in
+            *"$SIZE_TOKEN_DOT"*|*"$SIZE_TOKEN_US"*)
+                CANDIDATES+=("$d")
+                ;;
+        esac
+    fi
+done
+
+if [ ${#CANDIDATES[@]} -eq 0 ]; then
+    echo "Error: No model directory found in $BASE_DIR matching size '$MODEL_SIZE'"
+    echo "Existing dirs:"
+    ls -1 "$BASE_DIR"
     exit 1
 fi
 
-if [ ! -f "$MODEL_PATH/model.safetensors" ] && [ ! -f "$MODEL_PATH/model.safetensors.index.json" ]; then
-    echo "Error: No model files found in $MODEL_PATH"
-    echo "Please ensure the model is properly merged"
-    exit 1
-fi
+# Pick most recently modified candidate
+MODEL_BASE_PATH=$(ls -td "${CANDIDATES[@]}" 2>/dev/null | head -n 1)
+
+MERGED_MODELS_DIR="$MODEL_BASE_PATH/merged_models"
+SINGLE_MERGED_PATH="$MODEL_BASE_PATH/merged_model"
 
 echo "============================================"
 echo "Uploading model to HuggingFace"
 echo "============================================"
 echo "Model size: $MODEL_SIZE"
-echo "Source path: $MODEL_PATH"
+echo "Model base: $MODEL_BASE_PATH"
 echo "Repository: $FULL_REPO_NAME"
 echo ""
 
+# Export env for embedded python blocks
+export FULL_REPO_NAME
+export MERGED_MODELS_DIR
+export SINGLE_MERGED_PATH
+
 # Check if user is logged in to HuggingFace
 echo "Checking HuggingFace authentication..."
-.venv/bin/python -c "
+"$PYTHON_BIN" - <<'PYCODE'
 from huggingface_hub import whoami
 try:
     user_info = whoami()
-    print(f'Logged in as: {user_info[\"name\"]}')
-except Exception as e:
+    print('Logged in as: {}'.format(user_info['name']))
+except Exception:
     print('Error: Not logged in to HuggingFace')
     print('Please run: huggingface-cli login')
-    exit(1)
-"
+    raise
+PYCODE
 
 if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Upload the model
+# Upload models per step (multi) or single fallback
 echo ""
 echo "Starting upload..."
-.venv/bin/python -c "
+"$PYTHON_BIN" - <<'PYCODE'
 import os
-from huggingface_hub import HfApi, Repository, upload_folder
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import HfApi, upload_folder
 
-model_path = '$MODEL_PATH'
-repo_name = '$FULL_REPO_NAME'
+repo_name = os.environ['FULL_REPO_NAME']
+merged_models_dir = os.environ['MERGED_MODELS_DIR']
+single_merged_path = os.environ['SINGLE_MERGED_PATH']
 
-try:
-    # Create repository if it doesn't exist
-    api = HfApi()
-    
-    print(f'Creating/updating repository: {repo_name}')
-    api.create_repo(repo_id=repo_name, exist_ok=True, private=False)
-    
-    # Upload the entire model directory
-    print(f'Uploading model from {model_path}...')
+def has_model_files(path: str) -> bool:
+    return os.path.isfile(os.path.join(path, 'model.safetensors')) or \
+           os.path.isfile(os.path.join(path, 'model.safetensors.index.json'))
+
+api = HfApi()
+print('Creating/updating repository: {}'.format(repo_name))
+api.create_repo(repo_id=repo_name, exist_ok=True, private=False)
+
+step_dirs = []
+if os.path.isdir(merged_models_dir):
+    for name in sorted(os.listdir(merged_models_dir)):
+        local_path = os.path.join(merged_models_dir, name)
+        if os.path.isdir(local_path) and has_model_files(local_path):
+            step_dirs.append((name, local_path))
+
+# Fallback to single merged_model
+if not step_dirs and os.path.isdir(single_merged_path) and has_model_files(single_merged_path):
+    step_dirs.append(('merged_model', single_merged_path))
+
+if not step_dirs:
+    raise RuntimeError('No merged models found. Please run ./scripts/verl_to_hf.sh first.')
+
+for step_name, local_path in step_dirs:
+    print('Uploading step {} from {} → {}/{} ...'.format(step_name, local_path, repo_name, step_name))
     upload_folder(
-        folder_path=model_path,
+        folder_path=local_path,
         repo_id=repo_name,
         repo_type='model',
-        commit_message='Upload GRPO fine-tuned Qwen3 model'
+        path_in_repo=step_name,
+        commit_message='Upload GRPO model for {}'.format(step_name)
     )
-    
-    print(f'✓ Model successfully uploaded to: https://huggingface.co/{repo_name}')
-    
-except Exception as e:
-    print(f'✗ Upload failed: {e}')
-    exit(1)
-"
+    print('✓ Uploaded {}'.format(step_name))
+
+print('✓ All steps uploaded to: https://huggingface.co/{}'.format(repo_name))
+PYCODE
 
 if [ $? -eq 0 ]; then
     echo ""
