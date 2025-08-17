@@ -116,7 +116,7 @@ ARGS=(
   # basic node config
   trainer.n_gpus_per_node=8
   trainer.nnodes=1
-  trainer.save_freq=12
+  trainer.save_freq=4
   trainer.test_freq=2 # for 7B, 1 for 14B, 4 for all else
   trainer.resume_mode=disable # Force new run, don't recover from checkpoints
   # dumb settings
@@ -129,20 +129,20 @@ ARGS=(
   "trainer.project_name=${PROJECT_NAME}"
   "trainer.experiment_name=${EXPERIMENT_NAME}"
   # batch settings
-  trainer.total_epochs=2 # passes over the data
+  trainer.total_epochs=8 # passes over the data
   data.train_batch_size=${BATCH_SIZE} # gsm8k 7474 examples / this * epochs, 512 by default
   actor_rollout_ref.rollout.n=3 # batch_size generates n sized groups per prompt
   # we have now to process batch_size*3 to be process before .step() is called
   # actor_rollout_ref.actor.ppo_mini_batch_size=$((BATCH_SIZE / 4)) # .backward() called
-  actor_rollout_ref.actor.ppo_mini_batch_size=128
+  actor_rollout_ref.actor.ppo_mini_batch_size=256
   # each gpu process 1/n of mini batch_size ideally, then we call .backward()
   # for 8B 6 size, is using 85GB peak/95GB, with no grad checkpoint, 8 is using 42GB with grad cheeckpointing
   # takes half the time, try 16, and 64 for size_per_gpu now, 16 45GB wtf, nothing, 32 takes 56GB, going 64, only 65GB
   # could fit higher but nah, 64*8*3 fits nicely
-  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=8 # accumulate ppo_mini_batch_size/this*n_gpus times
+  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=64 # accumulate ppo_mini_batch_size/this*n_gpus times
   # making the log probs in parallel as well, consume less memory, cause no activations needed
-  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=32 # is sharded + no activations, can fit anything here, lol
-  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=32
+  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=64 # is sharded + no activations, can fit anything here, lol
+  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=64
   
   data.max_prompt_length=512 # might cut a few prompts short
   data.max_response_length=512 # limit responses length to
@@ -153,7 +153,7 @@ ARGS=(
   actor_rollout_ref.actor.kl_loss_type=low_var_kl # kl estimation method
   actor_rollout_ref.actor.entropy_coeff=0 # entropy bonus to encourage diverse responses
   actor_rollout_ref.rollout.name=vllm # backend for rollout's, ofc vllm
-  actor_rollout_ref.rollout.gpu_memory_utilization=0.6 # inference needs a lot of memory
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.85 # inference needs a lot of memory
   actor_rollout_ref.rollout.tensor_model_parallel_size=1 # tensor parallelism, if n_gpus > batch size
   actor_rollout_ref.rollout.enforce_eager=False # False, if True for debugging compile results
   actor_rollout_ref.rollout.dtype=bfloat16 # dtype, ofc bf16, maybe fp8 for some stuff
