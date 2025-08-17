@@ -57,7 +57,8 @@ echo "  Experiment: ${EXPERIMENT_NAME}"
   unset TRANSFORMERS_OFFLINE  
   unset HF_DATASETS_OFFLINE 
     python3 -c "
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from huggingface_hub import snapshot_download
 import torch
 import os
 print('Checking model cache...')
@@ -70,10 +71,17 @@ try:
     tokenizer = AutoTokenizer.from_pretrained('${MODEL_PATH}', 
                                             cache_dir='${HF_HOME}',
                                             local_files_only=True)
+    config = AutoConfig.from_pretrained('${MODEL_PATH}',
+                                       cache_dir='${HF_HOME}',
+                                       local_files_only=True)
     print('Model already in cache')
 except Exception as e:
     print(f'Downloading model: {e}')
-    # Download if not in cache
+    # Download entire repository to ensure all files are available
+    snapshot_download(repo_id='${MODEL_PATH}', 
+                     cache_dir='${HF_HOME}',
+                     ignore_patterns=['*.h5', '*.ot', '*.msgpack'])
+    # Then load to verify
     model = AutoModelForCausalLM.from_pretrained('${MODEL_PATH}', 
                                                 torch_dtype=torch.bfloat16, 
                                                 cache_dir='${HF_HOME}')
@@ -83,9 +91,12 @@ except Exception as e:
 "
 )
 
-# export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
-# export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
-# export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
+# Enable offline mode to prevent API calls after model is cached
+export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
+export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
+export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
+export VLLM_USE_MODELSCOPE=false  # Prevent VLLM from checking ModelScope
+export HF_HUB_DISABLE_TELEMETRY=1  # Disable telemetry to reduce connections
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
@@ -129,7 +140,7 @@ ARGS=(
   "trainer.project_name=${PROJECT_NAME}"
   "trainer.experiment_name=${EXPERIMENT_NAME}"
   # batch settings
-  trainer.total_epochs=8 # passes over the data
+  trainer.total_epochs=2 # passes over the data
   data.train_batch_size=${BATCH_SIZE} # gsm8k 7474 examples / this * epochs, 512 by default
   actor_rollout_ref.rollout.n=3 # batch_size generates n sized groups per prompt
   # we have now to process batch_size*3 to be process before .step() is called
