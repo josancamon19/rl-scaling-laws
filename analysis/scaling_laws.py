@@ -179,80 +179,192 @@ def plot_scaling(
         plt.show()
 
 
+def load_val_losses(results_json: Path) -> Dict[str, Dict[str, float]]:
+    """Load validation losses/perplexities and return mapping model -> metrics.
+
+    Expected JSON schema: list of entries with keys 'model', 'loss', 'perplexity'.
+    """
+    data = json.loads(Path(results_json).read_text())
+    model_to_metrics: Dict[str, Dict[str, float]] = {}
+    if isinstance(data, list):
+        for entry in data:
+            try:
+                model = entry.get("model")
+                loss = (
+                    float(entry.get("loss")) if entry.get("loss") is not None else None
+                )
+                ppl = (
+                    float(entry.get("perplexity"))
+                    if entry.get("perplexity") is not None
+                    else None
+                )
+                if model is None:
+                    continue
+                metrics: Dict[str, float] = {}
+                if loss is not None:
+                    metrics["loss"] = loss
+                if ppl is not None:
+                    metrics["perplexity"] = ppl
+                if metrics:
+                    model_to_metrics[model] = metrics
+            except Exception:
+                continue
+    return model_to_metrics
+
+
+def plot_val_scaling(
+    results_path: Path,
+    y_metric: str,
+    x_axis: str,
+    save_path: Path | None,
+    target_params_b: float | None = None,
+) -> None:
+    """Plot scaling for validation metrics (loss or perplexity) vs params/FLOPs."""
+    model_to_metrics = load_val_losses(results_path)
+    # Build mapping model -> metric value
+    model_to_value: Dict[str, float] = {}
+    for model_name, metrics in model_to_metrics.items():
+        if y_metric in metrics:
+            model_to_value[model_name] = float(metrics[y_metric])
+
+    if not model_to_value:
+        print(f"No '{y_metric}' data found in {results_path}")
+        return
+
+    X, Y, models = prepare_xy(model_to_value, x_axis)
+    if len(X) == 0:
+        print("No models with known parameter counts to plot.")
+        return
+
+    # Fit power-law y = A * x^alpha in log space
+    alpha, A, r2 = fit_power_law(X, Y)
+
+    plt.figure(figsize=(8, 6))
+    color = plt.rcParams["axes.prop_cycle"].by_key()["color"][0]
+    plt.scatter(X, Y, label=f"{y_metric}", alpha=0.85, color=color)
+
+    x_line = np.logspace(np.log10(X.min()), np.log10(X.max()), 200)
+    y_line = A * (x_line**alpha)
+    plt.plot(
+        x_line,
+        y_line,
+        color=color,
+        linewidth=2,
+        alpha=0.9,
+        label=f"fit: y = {A:.3g} x^{alpha:.3f}, R^2={r2:.3f}",
+    )
+
+    # If requested and plotting vs params, project the loss at target parameter size
+    if target_params_b is not None and x_axis == "params":
+        x_target = float(target_params_b) * 1e9
+        y_target = A * (x_target ** alpha)
+        guide_color = "teal"
+        plt.axvline(x=x_target, color=guide_color, linewidth=1.2)
+        plt.scatter([x_target], [y_target], color=guide_color, marker="*", s=80, zorder=5)
+        plt.annotate(
+            f"{target_params_b:.1f}B → {y_metric}≈{y_target:.3f}",
+            (x_target, y_target),
+            textcoords="offset points",
+            xytext=(6, 6),
+            ha="left",
+            fontsize=8,
+            color=guide_color,
+        )
+
+    # Annotate each point with N and metric value
+    for x_val, y_val, model_name in zip(X, Y, models):
+        n_params = QWEN3_BASE_PARAMS_N.get(model_name)
+        if n_params is None:
+            continue
+        if y_metric == "perplexity":
+            label_txt = f"{n_params / 1e9:.3g}B, ppl={y_val:.3f}"
+        else:
+            label_txt = f"{n_params / 1e9:.3g}B, loss={y_val:.3f}"
+        plt.annotate(
+            label_txt,
+            (x_val, y_val),
+            textcoords="offset points",
+            xytext=(5, 4),
+            ha="left",
+            fontsize=8,
+            color=color,
+        )
+
+    axis_label_x = (
+        "FLOPs (C = 6ND)" if x_axis == "flops" else "Non-embedding parameters N"
+    )
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel(axis_label_x)
+    plt.ylabel("Perplexity" if y_metric == "perplexity" else "Loss")
+    plt.title(f"Power-law scaling: validation {y_metric} vs {axis_label_x}")
+    plt.grid(True, which="both", linestyle=":", linewidth=0.6)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_path is not None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=180)
+        print(f"Saved figure to {save_path}")
+    else:
+        plt.show()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--results",
-        type=str,
-        required=True,
-        help="Path to JSON results produced by eval/run.py",
-    )
-    parser.add_argument(
-        "--benchmark",
-        type=str,
-        choices=["mmlu", "gsm8k"],
-        default="gsm8k",
-        help="Benchmark to visualize",
-    )
-    parser.add_argument(
-        "--x-axis",
-        type=str,
-        choices=["flops", "params"],
-        default="params",
-        help="X axis variable (flops uses C = 6ND; params uses N)",
-    )
-    parser.add_argument(
-        "--shots",
-        nargs="*",
-        type=int,
-        default=[0],  # , 1, 2, 3, 4, 5],
-        help="Shot counts to include",
-    )
-    parser.add_argument("--save", type=str, default=None, help="(Deprecated) Use --out-dir.")
-    parser.add_argument(
-        "--out-dir",
-        type=str,
-        default=str(Path(__file__).resolve().parent.parent / "results"),
-        help="Directory to store generated figures (default: ./results at repo root)",
-    )
-    parser.add_argument(
-        "--generate-all",
-        action="store_true",
-        default=True,
-        help="Generate figures for all benchmarks and all available shots",
-    )
-    args = parser.parse_args()
+    # No required CLI arguments; defaults to generating all figures from repository result files
+    parser.parse_args()
 
-    out_dir = Path(args.out_dir)
+    repo_root = Path(__file__).resolve().parent.parent
+    out_dir = Path(str(repo_root / "results" / "scaling_laws"))
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.generate_all:
+    # Default input files under results/
+    benchmarks_json = repo_root / "results" / "benchmarks.json"
+    val_losses_json = repo_root / "results" / "val_losses.json"
+
+    # Benchmark accuracy plots
+    if benchmarks_json.exists():
         for benchmark in ["gsm8k", "mmlu"]:
-            shots = discover_available_shots(Path(args.results), benchmark)
+            try:
+                shots = discover_available_shots(benchmarks_json, benchmark)
+            except Exception as e:
+                print(f"Failed to read shots from {benchmarks_json}: {e}")
+                shots = []
             if not shots:
                 continue
-            for x_axis in ["params", "flops"]:
+            for x_axis in ["flops"]:  # "params",
                 shots_part = "shots-" + "-".join(str(k) for k in shots)
-                fname = f"{Path(args.results).stem}_{benchmark}_{x_axis}_{shots_part}.png"
+                fname = f"{benchmarks_json.stem}_{benchmark}_{x_axis}_{shots_part}.png"
                 save_path = out_dir / fname
                 plot_scaling(
-                    results_path=Path(args.results),
+                    results_path=benchmarks_json,
                     benchmark=benchmark,
                     shots=shots,
                     x_axis=x_axis,
                     save_path=save_path,
                 )
     else:
-        # Single figure mode
-        shots_part = "shots-" + "-".join(str(k) for k in args.shots)
-        fname = f"{Path(args.results).stem}_{args.benchmark}_{args.x_axis}_{shots_part}.png"
-        save_path = out_dir / fname
-        plot_scaling(
-            results_path=Path(args.results),
-            benchmark=args.benchmark,
-            shots=args.shots,
-            x_axis=args.x_axis,
-            save_path=save_path,
+        print(
+            f"No benchmark accuracy file found at {benchmarks_json}; skipping accuracy plots."
+        )
+
+    # Validation loss/perplexity plots
+    if val_losses_json.exists():
+        for metric in ["loss"]:  # "perplexity"
+            for x_axis in ["params", "flops"]:
+                fname = f"{val_losses_json.stem}_{metric}_{x_axis}.png"
+                save_path = out_dir / fname
+                plot_val_scaling(
+                    results_path=val_losses_json,
+                    y_metric=metric,
+                    x_axis=x_axis,
+                    target_params_b=31.2 if x_axis == "params" else None,
+                    save_path=save_path,
+                )
+    else:
+        print(
+            f"No validation loss file found at {val_losses_json}; skipping validation plots."
         )
 
 

@@ -12,4 +12,5 @@ outputs
 wandb
 checkpoints
 data/
-results
+results/*.png
+results/scaling_laws/
