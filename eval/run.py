@@ -6,6 +6,7 @@ import sys
 import time
 import gc
 import torch
+import random
 from pathlib import Path
 
 # Allow importing from the project root
@@ -116,6 +117,54 @@ def _save_results(results: dict, output_path: Path):
     with output_path.open("w") as f:
         json.dump(results, f, indent=2)
     print(f"Saved results to {output_path}")
+
+
+def _save_gsm8k_samples(
+    model_name: str, 
+    num_shots: int, 
+    prompts: List[str], 
+    ground_truths: List[str], 
+    responses: List[str],
+    output_dir: Path = None
+):
+    """Save random samples of GSM8K evaluation results to a text file"""
+    if output_dir is None:
+        output_dir = Path(__file__).parent / "samples"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Clean model name for filename
+    clean_model_name = model_name.replace("/", "_").replace("-", "_")
+    filename = f"gsm8k_samples_{clean_model_name}_{num_shots}shot.txt"
+    output_path = output_dir / filename
+    
+    # Select random samples (up to 10)
+    num_samples = min(10, len(prompts))
+    indices = random.sample(range(len(prompts)), num_samples)
+    
+    with output_path.open("w") as f:
+        f.write(f"GSM8K Samples for {model_name} - {num_shots}-shot\n")
+        f.write(f"{'=' * 80}\n\n")
+        f.write(f"Total samples: {num_samples} (randomly selected from {len(prompts)})\n\n")
+        
+        for i, idx in enumerate(indices):
+            f.write(f"Sample {i+1}/{num_samples} (Index: {idx})\n")
+            f.write(f"{'-' * 80}\n\n")
+            
+            f.write("PROMPT:\n")
+            f.write(prompts[idx])
+            f.write("\n\n")
+            
+            f.write("EXPECTED ANSWER:\n")
+            f.write(ground_truths[idx])
+            f.write("\n\n")
+            
+            f.write("MODEL RESPONSE:\n")
+            f.write(responses[idx])
+            f.write("\n\n")
+            
+            f.write(f"{'=' * 80}\n\n")
+    
+    print(f"Saved {num_samples} samples to {output_path}")
 
 
 def cleanup_vllm_resources(llm=None):
@@ -258,6 +307,7 @@ def main():
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--shots", nargs="*", type=int, default=[0, 1, 2, 3, 4, 5])
     parser.add_argument("--include-mmlu", action="store_true", default=False)
+    parser.add_argument("--keep-samples", action="store_true", default=True)
     args = parser.parse_args()
 
     output_path = Path(str(Path(__file__).parent / "results.json"))
@@ -391,6 +441,17 @@ def main():
                         "correct": gsm_res.get("correct"),
                         "total": gsm_res.get("total"),
                     }
+                    
+                    # Save samples if requested
+                    if args.keep_samples and "prompts" in gsm_res:
+                        _save_gsm8k_samples(
+                            model_name=model_name,
+                            num_shots=k,
+                            prompts=gsm_res["prompts"],
+                            ground_truths=gsm_res["ground_truths"],
+                            responses=gsm_res["responses"]
+                        )
+                        
                 except Exception as e:
                     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
                         "error": str(e)
@@ -425,3 +486,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # TODO: 0.6B results at the end decrease? check prompts
+    # TODO: 4B results wtf, same for 8,14, but check for 4B shots samples and verify prompts

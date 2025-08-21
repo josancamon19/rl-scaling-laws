@@ -132,42 +132,66 @@ def plot_gsm8k_shots_vs_accuracy(
 ) -> None:
     """Plot GSM8K accuracy vs shots for different model sizes."""
     shot_to_model_acc = load_accuracy_by_model(results_path, "gsm8k", shots)
-    
+
     # Get all models and sort by parameter count
     all_models = set()
     for shot_dict in shot_to_model_acc.values():
         all_models.update(shot_dict.keys())
-    
+
     # Filter to models with known parameters and sort by size
-    models_with_params = [(m, QWEN3_BASE_PARAMS_N[m]) for m in all_models if m in QWEN3_BASE_PARAMS_N]
+    models_with_params = [
+        (m, QWEN3_BASE_PARAMS_N[m]) for m in all_models if m in QWEN3_BASE_PARAMS_N
+    ]
     models_with_params.sort(key=lambda x: x[1])  # Sort by parameter count
-    
+
     plt.figure(figsize=(10, 6))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    
+
     for idx, (model, n_params) in enumerate(models_with_params):
         accuracies = []
         shots_for_model = []
-        
+
         for shot in shots:
             if model in shot_to_model_acc[shot]:
                 acc = shot_to_model_acc[shot][model]
                 accuracies.append(acc)
                 shots_for_model.append(shot)
-        
+
         if accuracies:
             color = colors[idx % len(colors)]
             label = QWEN3_MODEL_SIZES.get(model, f"{n_params / 1e9:.1f}B")
-            plt.plot(shots_for_model, accuracies, 'o', label=label, 
-                    color=color, markersize=8, alpha=0.8)
-    
+
+            # Add light dotted lines for 0.6B and 1.7B models
+            model_size = QWEN3_MODEL_SIZES.get(model, "")
+            if model_size in ["0.6B", "1.7B"]:
+                plt.plot(
+                    shots_for_model,
+                    accuracies,
+                    "o:",
+                    label=label,
+                    color=color,
+                    markersize=8,
+                    alpha=0.8,
+                    linewidth=1.5,
+                )
+            else:
+                plt.plot(
+                    shots_for_model,
+                    accuracies,
+                    "o",
+                    label=label,
+                    color=color,
+                    markersize=8,
+                    alpha=0.8,
+                )
+
     plt.xlabel("Number of shots")
     plt.ylabel("GSM8K accuracy (%)")
     plt.title("GSM8K Performance vs Number of Shots")
     plt.grid(True, linestyle=":", linewidth=0.6)
     plt.legend(title="Model Size", loc="best")
     plt.tight_layout()
-    
+
     if save_path is not None:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, dpi=180)
@@ -183,42 +207,66 @@ def plot_mmlu_shots_vs_accuracy(
 ) -> None:
     """Plot MMLU accuracy vs shots for different model sizes."""
     shot_to_model_acc = load_accuracy_by_model(results_path, "mmlu", shots)
-    
+
     # Get all models and sort by parameter count
     all_models = set()
     for shot_dict in shot_to_model_acc.values():
         all_models.update(shot_dict.keys())
-    
+
     # Filter to models with known parameters and sort by size
-    models_with_params = [(m, QWEN3_BASE_PARAMS_N[m]) for m in all_models if m in QWEN3_BASE_PARAMS_N]
+    models_with_params = [
+        (m, QWEN3_BASE_PARAMS_N[m]) for m in all_models if m in QWEN3_BASE_PARAMS_N
+    ]
     models_with_params.sort(key=lambda x: x[1])  # Sort by parameter count
-    
+
     plt.figure(figsize=(10, 6))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    
+
     for idx, (model, n_params) in enumerate(models_with_params):
         accuracies = []
         shots_for_model = []
-        
+
         for shot in shots:
             if model in shot_to_model_acc[shot]:
                 acc = shot_to_model_acc[shot][model]
                 accuracies.append(acc)
                 shots_for_model.append(shot)
-        
+
         if accuracies:
             color = colors[idx % len(colors)]
             label = QWEN3_MODEL_SIZES.get(model, f"{n_params / 1e9:.1f}B")
-            plt.plot(shots_for_model, accuracies, 'o', label=label, 
-                    color=color, markersize=8, alpha=0.8)
-    
+
+            # Add light dotted lines for 0.6B and 1.7B models
+            model_size = QWEN3_MODEL_SIZES.get(model, "")
+            if model_size in ["0.6B", "1.7B"]:
+                plt.plot(
+                    shots_for_model,
+                    accuracies,
+                    "o:",
+                    label=label,
+                    color=color,
+                    markersize=8,
+                    alpha=0.8,
+                    linewidth=1.5,
+                )
+            else:
+                plt.plot(
+                    shots_for_model,
+                    accuracies,
+                    "o",
+                    label=label,
+                    color=color,
+                    markersize=8,
+                    alpha=0.8,
+                )
+
     plt.xlabel("Number of shots")
     plt.ylabel("MMLU accuracy (%)")
     plt.title("MMLU Performance vs Number of Shots")
     plt.grid(True, linestyle=":", linewidth=0.6)
     plt.legend(title="Model Size", loc="best")
     plt.tight_layout()
-    
+
     if save_path is not None:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, dpi=180)
@@ -363,16 +411,21 @@ def plot_val_scaling(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    # No required CLI arguments; defaults to generating all figures from repository result files
-    parser.parse_args()
+    parser.add_argument(
+        "--baseline-type",
+        type=str,
+        choices=["strict", "flexible"],
+        default="strict",
+        help="Choose baseline evaluation type: 'strict' (default) or 'flexible'",
+    )
+    args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
-    out_dir = Path(str(repo_root / "results" / "scaling_laws"))
+    out_dir = Path(str(repo_root / "results" / "scaling_laws" / args.baseline_type))
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Default input files under results/
-    # Note: the file is named "baslines.json" with a typo
-    baselines_json = repo_root / "results" / "baslines.json"
+    # Select baseline file based on argument
+    baselines_json = repo_root / "results" / f"baselines_{args.baseline_type}.json"
     val_losses_json = repo_root / "results" / "val_losses.json"
 
     # GSM8K: Plot accuracy vs shots for different model sizes
@@ -404,6 +457,7 @@ def main() -> None:
         print(f"Failed to generate MMLU plots: {e}")
 
     # Validation loss/perplexity plots
+    out_dir = Path(str(repo_root / "results" / "scaling_laws"))
     if val_losses_json.exists():
         for metric in ["loss"]:  # "perplexity"
             for x_axis in ["params", "flops"]:

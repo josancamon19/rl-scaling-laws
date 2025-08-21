@@ -1,0 +1,247 @@
+{
+  "temperature": 0.0,
+  "shots": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "mmlu_split": "test",
+  "gsm8k_split": "test",
+  "models": [
+    {
+      "model": "Qwen/Qwen3-0.6B-base",
+      "model_id": "Qwen/Qwen3-0.6B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 0.0,
+              "correct": 0,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 11.978771796815769,
+              "correct": 158,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 33.66186504927976,
+              "correct": 444,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 28.50644427596664,
+              "correct": 376,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 25.018953752843064,
+              "correct": 330,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 26.535253980288097,
+              "correct": 350,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755799221,
+      "ended_at": 1755799307
+    },
+    {
+      "model": "Qwen/Qwen3-1.7B-base",
+      "model_id": "Qwen/Qwen3-1.7B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 0.0758150113722517,
+              "correct": 1,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 2.577710386656558,
+              "correct": 34,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 58.90826383623957,
+              "correct": 776,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 60.50037907505686,
+              "correct": 798,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 61.18271417740713,
+              "correct": 807,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 59.59059893858984,
+              "correct": 786,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755799307,
+      "ended_at": 1755799411
+    },
+    {
+      "model": "Qwen/Qwen3-4B-base",
+      "model_id": "Qwen/Qwen3-4B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 67.47536012130402,
+              "correct": 890,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 1.2130401819560273,
+              "correct": 16,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 0.7581501137225171,
+              "correct": 10,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 15.921152388172857,
+              "correct": 209,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 7.12661106899166,
+              "correct": 94,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 4.169825625473845,
+              "correct": 55,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755799411,
+      "ended_at": 1755799644
+    },
+    {
+      "model": "Qwen/Qwen3-8B-base",
+      "model_id": "Qwen/Qwen3-8B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 72.02426080363912,
+              "correct": 950,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 0.1516300227445034,
+              "correct": 2,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 0.0758150113722517,
+              "correct": 1,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 85.74677786201667,
+              "correct": 1130,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 18.19560272934041,
+              "correct": 240,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 1.7437452615617892,
+              "correct": 23,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755799644,
+      "ended_at": 1755799900
+    },
+    {
+      "model": "Qwen/Qwen3-14B-base",
+      "model_id": "Qwen/Qwen3-14B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 75.89082638362396,
+              "correct": 1001,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 5.155420773313116,
+              "correct": 68,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 82.78999241849885,
+              "correct": 1091,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 87.94541319181198,
+              "correct": 1160,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 83.47232752084913,
+              "correct": 1101,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 20.621683093252464,
+              "correct": 272,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755799900,
+      "ended_at": 1755800157
+    }
+  ],
+  "started_at": 1755799037,
+  "ended_at": 1755800157
+}
