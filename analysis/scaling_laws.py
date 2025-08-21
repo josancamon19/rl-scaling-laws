@@ -27,6 +27,15 @@ QWEN3_BASE_PARAMS_N: Dict[str, float] = {
     "Qwen/Qwen3-0.6B-base": 0.44e9,
 }
 
+# Actual advertised model sizes (including embedding params)
+QWEN3_MODEL_SIZES: Dict[str, str] = {
+    "Qwen/Qwen3-14B-base": "14B",
+    "Qwen/Qwen3-8B-base": "8B",
+    "Qwen/Qwen3-4B-base": "4B",
+    "Qwen/Qwen3-1.7B-base": "1.7B",
+    "Qwen/Qwen3-0.6B-base": "0.6B",
+}
+
 
 def compute_flops(n_non_embedding_params: float, num_tokens: float = 36e12) -> float:
     """Compute FLOPs C using C = 6 * N * D.
@@ -116,72 +125,100 @@ def fit_power_law(x: np.ndarray, y: np.ndarray) -> Tuple[float, float, float]:
     return alpha, A, r2
 
 
-def plot_scaling(
+def plot_gsm8k_shots_vs_accuracy(
     results_path: Path,
-    benchmark: str,
     shots: List[int],
-    x_axis: str,
     save_path: Path | None,
 ) -> None:
-    shot_to_model_acc = load_accuracy_by_model(results_path, benchmark, shots)
-
-    plt.figure(figsize=(8, 6))
+    """Plot GSM8K accuracy vs shots for different model sizes."""
+    shot_to_model_acc = load_accuracy_by_model(results_path, "gsm8k", shots)
+    
+    # Get all models and sort by parameter count
+    all_models = set()
+    for shot_dict in shot_to_model_acc.values():
+        all_models.update(shot_dict.keys())
+    
+    # Filter to models with known parameters and sort by size
+    models_with_params = [(m, QWEN3_BASE_PARAMS_N[m]) for m in all_models if m in QWEN3_BASE_PARAMS_N]
+    models_with_params.sort(key=lambda x: x[1])  # Sort by parameter count
+    
+    plt.figure(figsize=(10, 6))
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-
-    for idx, k in enumerate(shots):
-        model_to_acc = shot_to_model_acc.get(k, {})
-        if not model_to_acc:
-            continue
-        X, Y, models = prepare_xy(model_to_acc, x_axis)
-        # Plot even if only one point; handle zeros on log-scale by clamping to a small epsilon
-        if len(X) == 0:
-            continue
-        Y = np.asarray(Y, dtype=float)
-        positive_mask = Y > 0
-        if np.any(positive_mask):
-            min_pos = float(np.min(Y[positive_mask]))
-            eps = min_pos / 10.0
-        else:
-            eps = 0.01  # very small % so the point appears near the bottom
-        Y_plot = Y.copy()
-        Y_plot[~positive_mask] = eps
-        # alpha, A, r2 = fit_power_law(X, Y)
-        label = f"{k}-shot"  # y = {A:.3g} x^{alpha:.3f}, R^2={r2:.3f}
-        color = colors[idx % len(colors)]
-        plt.scatter(X, Y_plot, label=label, alpha=0.8, color=color)
-
-        # x_line = np.logspace(np.log10(X.min()), np.log10(X.max()), 200)
-        # y_line = A * (x_line**alpha)
-        # plt.plot(x_line, y_line, color=color, linewidth=2, alpha=0.9)
-
-        # Annotate each point with the model parameter size and raw accuracy (e.g., 0.6B, 42.1%)
-        for x_val, y_plot_val, model_name, y_true_val in zip(X, Y_plot, models, Y):
-            n_params = QWEN3_BASE_PARAMS_N.get(model_name)
-            if n_params is None:
-                continue
-            label_txt = f"{n_params / 1e9:.3g}B, {y_true_val:.2f}%"
-            plt.annotate(
-                label_txt,
-                (x_val, y_plot_val),
-                textcoords="offset points",
-                xytext=(5, 4),
-                ha="left",
-                fontsize=8,
-                color=color,
-            )
-
-    axis_label_x = (
-        "FLOPs (C = 6ND)" if x_axis == "flops" else "Non-embedding parameters N"
-    )
-    plt.xscale("log")
-    plt.yscale("log")
-    plt.xlabel(axis_label_x)
-    plt.ylabel(f"{benchmark.upper()} accuracy (%)")
-    plt.title(f"Power-law scaling: {benchmark.upper()} vs {axis_label_x}")
-    plt.grid(True, which="both", linestyle=":", linewidth=0.6)
-    plt.legend()
+    
+    for idx, (model, n_params) in enumerate(models_with_params):
+        accuracies = []
+        shots_for_model = []
+        
+        for shot in shots:
+            if model in shot_to_model_acc[shot]:
+                acc = shot_to_model_acc[shot][model]
+                accuracies.append(acc)
+                shots_for_model.append(shot)
+        
+        if accuracies:
+            color = colors[idx % len(colors)]
+            label = QWEN3_MODEL_SIZES.get(model, f"{n_params / 1e9:.1f}B")
+            plt.plot(shots_for_model, accuracies, 'o', label=label, 
+                    color=color, markersize=8, alpha=0.8)
+    
+    plt.xlabel("Number of shots")
+    plt.ylabel("GSM8K accuracy (%)")
+    plt.title("GSM8K Performance vs Number of Shots")
+    plt.grid(True, linestyle=":", linewidth=0.6)
+    plt.legend(title="Model Size", loc="best")
     plt.tight_layout()
+    
+    if save_path is not None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=180)
+        print(f"Saved figure to {save_path}")
+    else:
+        plt.show()
 
+
+def plot_mmlu_shots_vs_accuracy(
+    results_path: Path,
+    shots: List[int],
+    save_path: Path | None,
+) -> None:
+    """Plot MMLU accuracy vs shots for different model sizes."""
+    shot_to_model_acc = load_accuracy_by_model(results_path, "mmlu", shots)
+    
+    # Get all models and sort by parameter count
+    all_models = set()
+    for shot_dict in shot_to_model_acc.values():
+        all_models.update(shot_dict.keys())
+    
+    # Filter to models with known parameters and sort by size
+    models_with_params = [(m, QWEN3_BASE_PARAMS_N[m]) for m in all_models if m in QWEN3_BASE_PARAMS_N]
+    models_with_params.sort(key=lambda x: x[1])  # Sort by parameter count
+    
+    plt.figure(figsize=(10, 6))
+    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    
+    for idx, (model, n_params) in enumerate(models_with_params):
+        accuracies = []
+        shots_for_model = []
+        
+        for shot in shots:
+            if model in shot_to_model_acc[shot]:
+                acc = shot_to_model_acc[shot][model]
+                accuracies.append(acc)
+                shots_for_model.append(shot)
+        
+        if accuracies:
+            color = colors[idx % len(colors)]
+            label = QWEN3_MODEL_SIZES.get(model, f"{n_params / 1e9:.1f}B")
+            plt.plot(shots_for_model, accuracies, 'o', label=label, 
+                    color=color, markersize=8, alpha=0.8)
+    
+    plt.xlabel("Number of shots")
+    plt.ylabel("MMLU accuracy (%)")
+    plt.title("MMLU Performance vs Number of Shots")
+    plt.grid(True, linestyle=":", linewidth=0.6)
+    plt.legend(title="Model Size", loc="best")
+    plt.tight_layout()
+    
     if save_path is not None:
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path, dpi=180)
@@ -275,7 +312,7 @@ def plot_val_scaling(
             [x_target], [y_target], color=guide_color, marker="*", s=80, zorder=5
         )
         plt.annotate(
-            f"{target_params_b:.1f}B → {y_metric}≈{y_target:.3f}",
+            f"{target_params_b}B → {y_metric}≈{y_target:.3f}",
             (x_target, y_target),
             textcoords="offset points",
             xytext=(6, 6),
@@ -284,15 +321,16 @@ def plot_val_scaling(
             color=guide_color,
         )
 
-    # Annotate each point with N and metric value
+    # Annotate each point with model size and metric value
     for x_val, y_val, model_name in zip(X, Y, models):
         n_params = QWEN3_BASE_PARAMS_N.get(model_name)
         if n_params is None:
             continue
+        model_size = QWEN3_MODEL_SIZES.get(model_name, f"{n_params / 1e9:.3g}B")
         if y_metric == "perplexity":
-            label_txt = f"{n_params / 1e9:.3g}B, ppl={y_val:.3f}"
+            label_txt = f"{model_size}, ppl={y_val:.3f}"
         else:
-            label_txt = f"{n_params / 1e9:.3g}B, loss={y_val:.3f}"
+            label_txt = f"{model_size}, loss={y_val:.3f}"
         plt.annotate(
             label_txt,
             (x_val, y_val),
@@ -333,28 +371,38 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Default input files under results/
-    benchmarks_json = repo_root / "results" / "benchmarks.json"
+    # Note: the file is named "baslines.json" with a typo
+    baselines_json = repo_root / "results" / "baslines.json"
     val_losses_json = repo_root / "results" / "val_losses.json"
 
-    for benchmark in ["gsm8k", "mmlu"]:
-        try:
-            shots = discover_available_shots(benchmarks_json, benchmark)
-        except Exception as e:
-            print(f"Failed to read shots from {benchmarks_json}: {e}")
-            shots = []
-        if not shots:
-            continue
-        for x_axis in ["params"]:
-            shots_part = "shots-" + "-".join(str(k) for k in shots)
-            fname = f"{benchmarks_json.stem}_{benchmark}_{x_axis}_{shots_part}.png"
+    # GSM8K: Plot accuracy vs shots for different model sizes
+    try:
+        shots = discover_available_shots(baselines_json, "gsm8k")
+        if shots:
+            fname = f"gsm8k_shots_vs_accuracy.png"
             save_path = out_dir / fname
-            plot_scaling(
-                results_path=benchmarks_json,
-                benchmark=benchmark,
+            plot_gsm8k_shots_vs_accuracy(
+                results_path=baselines_json,
                 shots=shots,
-                x_axis=x_axis,
                 save_path=save_path,
             )
+    except Exception as e:
+        print(f"Failed to generate GSM8K plot: {e}")
+
+    # MMLU: Plot accuracy vs shots for different model sizes
+    try:
+        shots = discover_available_shots(baselines_json, "mmlu")
+        if shots:
+            fname = f"mmlu_shots_vs_accuracy.png"
+            save_path = out_dir / fname
+            plot_mmlu_shots_vs_accuracy(
+                results_path=baselines_json,
+                shots=shots,
+                save_path=save_path,
+            )
+    except Exception as e:
+        print(f"Failed to generate MMLU plots: {e}")
+
     # Validation loss/perplexity plots
     if val_losses_json.exists():
         for metric in ["loss"]:  # "perplexity"

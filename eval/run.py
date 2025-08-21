@@ -27,7 +27,7 @@ def get_available_grpo_checkpoints(repo_id: str) -> List[Dict[str, str]]:
     except Exception as e:
         print(f"Error listing branches for {repo_id}: {e}")
         return []
-    
+
     global_step_branches = []
     for branch in branches:
         # Look for branches named like "global-step-100"
@@ -222,7 +222,7 @@ logging.getLogger("vllm").setLevel(logging.ERROR)
 def main():
     parser = argparse.ArgumentParser(description="Run benchmarks on language models")
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--shots", nargs="*", type=int, default=[0])  # , 1, 2, 3, 4, 5
+    parser.add_argument("--shots", nargs="*", type=int, default=[0, 1, 2, 3, 4, 5])
     args = parser.parse_args()
 
     output_path = Path(str(Path(__file__).parent / "results.json"))
@@ -248,13 +248,11 @@ def main():
         }
 
     model_list = _build_model_list(
-        include_grpo=True,
+        include_grpo=False,
         grpo_only=False,
         grpo_username="josancamon",
         max_grpo_checkpoints=None,
     )
-
-    model_list = model_list[1:2]
 
     for model_item in model_list:
         # Handle both simple string models and complex model entries
