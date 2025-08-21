@@ -409,12 +409,184 @@ def plot_val_scaling(
         plt.show()
 
 
+def plot_avg_accuracy_scaling(
+    results_path: Path,
+    benchmark: str,
+    save_path: Path | None,
+    target_params_b: float | None = None,
+    use_error_rate: bool = True,
+) -> None:
+    """Plot scaling law: average accuracy/error across shots vs model parameters.
+
+    This function:
+    1. Calculates average accuracy across all shots for each model
+    2. Converts to error rate (100 - accuracy) for better scaling law fit
+    3. Plots on log scale
+    4. Fits power law: error = A * params^alpha (or accuracy if use_error_rate=False)
+    5. Extrapolates to target parameter size if provided
+    """
+    # Discover all available shots for the benchmark
+    shots = discover_available_shots(results_path, benchmark)
+    if not shots:
+        print(f"No shots found for {benchmark}")
+        return
+
+    # Load accuracy data for all shots
+    shot_to_model_acc = load_accuracy_by_model(results_path, benchmark, shots)
+
+    # Calculate average accuracy per model across all shots
+    model_to_avg_acc: Dict[str, float] = {}
+    for model in QWEN3_BASE_PARAMS_N:
+        accuracies = []
+        for shot in shots:
+            if model in shot_to_model_acc[shot]:
+                accuracies.append(shot_to_model_acc[shot][model])
+        if accuracies:
+            avg_acc = np.mean(accuracies)
+            # Convert to error rate if requested
+            if use_error_rate:
+                model_to_avg_acc[model] = 100.0 - avg_acc
+            else:
+                model_to_avg_acc[model] = avg_acc
+
+    if not model_to_avg_acc:
+        print(f"No average accuracy data for {benchmark}")
+        return
+
+    # Prepare data for plotting (x-axis is params, not flops)
+    X, Y, models = prepare_xy(model_to_avg_acc, "params")
+    if len(X) == 0:
+        print("No models with known parameter counts to plot.")
+        return
+
+    # Fit power law: y = A * x^alpha
+    alpha, A, r2 = fit_power_law(X, Y)
+
+    plt.figure(figsize=(10, 7))
+    color = plt.rcParams["axes.prop_cycle"].by_key()["color"][0]
+
+    # Plot data points
+    plt.scatter(X, Y, s=100, alpha=0.85, color=color, zorder=3)
+
+    # Plot fitted power law
+    x_line = np.logspace(np.log10(X.min()), np.log10(X.max()), 200)
+    y_line = A * (x_line**alpha)
+
+    metric_name = "error rate" if use_error_rate else "accuracy"
+    plt.plot(
+        x_line,
+        y_line,
+        color=color,
+        linewidth=2.5,
+        alpha=0.9,
+        label=f"Power law fit: {metric_name} = {A:.3g} × N^{{{alpha:.3f}}}\nR² = {r2:.3f}",
+    )
+
+    # Extrapolate to target parameter size
+    if target_params_b is not None:
+        x_target = float(target_params_b) * 1e9
+        y_target = A * (x_target**alpha)
+
+        # Extend the fitted line to target if needed
+        if x_target > X.max():
+            x_extended = np.logspace(np.log10(X.min()), np.log10(x_target * 1.1), 300)
+            y_extended = A * (x_extended**alpha)
+            plt.plot(
+                x_extended[len(x_line) :],
+                y_extended[len(x_line) :],
+                color=color,
+                linewidth=2.5,
+                alpha=0.5,
+                linestyle="--",
+            )
+
+        # Add visual guides for target
+        guide_color = "red"
+        plt.axvline(
+            x=x_target, color=guide_color, linewidth=1.5, linestyle=":", alpha=0.7
+        )
+        plt.scatter(
+            [x_target], [y_target], color=guide_color, marker="*", s=300, zorder=5
+        )
+        if use_error_rate:
+            # Convert back to accuracy for display
+            accuracy_at_target = 100.0 - y_target
+            annotation_text = f"Estimated at {target_params_b}B:\nError rate ≈ {y_target:.2f}%\n(Accuracy ≈ {accuracy_at_target:.2f}%)"
+        else:
+            annotation_text = (
+                f"Estimated at {target_params_b}B:\nAccuracy ≈ {y_target:.2f}%"
+            )
+
+        plt.annotate(
+            annotation_text,
+            (x_target, y_target),
+            textcoords="offset points",
+            xytext=(-80, -30),
+            ha="center",
+            fontsize=11,
+            color=guide_color,
+            bbox=dict(
+                boxstyle="round,pad=0.3",
+                facecolor="white",
+                edgecolor=guide_color,
+                alpha=0.8,
+            ),
+            arrowprops=dict(arrowstyle="->", color=guide_color, lw=1.5),
+        )
+
+    # Annotate each point with model size and metric value
+    for x_val, y_val, model_name in zip(X, Y, models):
+        model_size = QWEN3_MODEL_SIZES.get(
+            model_name, f"{QWEN3_BASE_PARAMS_N[model_name] / 1e9:.1f}B"
+        )
+        if use_error_rate:
+            label_text = f"{model_size}\n{y_val:.1f}% error"
+        else:
+            label_text = f"{model_size}\n{y_val:.1f}%"
+        plt.annotate(
+            label_text,
+            (x_val, y_val),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            fontsize=9,
+            color="black",
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7),
+        )
+
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel("Non-embedding Parameters (N)", fontsize=12)
+    if use_error_rate:
+        plt.ylabel(f"Average {benchmark.upper()} Error Rate (%)", fontsize=12)
+        plt.title(
+            f"Scaling Law: {benchmark.upper()} Error Rate vs Model Size\n(Average across all shots)",
+            fontsize=14,
+        )
+    else:
+        plt.ylabel(f"Average {benchmark.upper()} Accuracy (%)", fontsize=12)
+        plt.title(
+            f"Scaling Law: {benchmark.upper()} Performance vs Model Size\n(Average across all shots)",
+            fontsize=14,
+        )
+    plt.grid(True, which="both", linestyle=":", linewidth=0.6, alpha=0.5)
+    plt.legend(loc="lower right", fontsize=11)
+    plt.tight_layout()
+
+    if save_path is not None:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=180, bbox_inches="tight")
+        print(f"Saved scaling law figure to {save_path}")
+    else:
+        plt.show()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--baseline-type",
         type=str,
-        choices=["strict", "flexible"],
+        choices=["strict", "flexible", "flexible_custom"],
         default="strict",
         help="Choose baseline evaluation type: 'strict' (default) or 'flexible'",
     )
@@ -432,7 +604,7 @@ def main() -> None:
     try:
         shots = discover_available_shots(baselines_json, "gsm8k")
         if shots:
-            fname = f"gsm8k_shots_vs_accuracy.png"
+            fname = "gsm8k_shots_vs_accuracy.png"
             save_path = out_dir / fname
             plot_gsm8k_shots_vs_accuracy(
                 results_path=baselines_json,
@@ -446,7 +618,7 @@ def main() -> None:
     try:
         shots = discover_available_shots(baselines_json, "mmlu")
         if shots:
-            fname = f"mmlu_shots_vs_accuracy.png"
+            fname = "mmlu_shots_vs_accuracy.png"
             save_path = out_dir / fname
             plot_mmlu_shots_vs_accuracy(
                 results_path=baselines_json,
@@ -455,6 +627,23 @@ def main() -> None:
             )
     except Exception as e:
         print(f"Failed to generate MMLU plots: {e}")
+
+    # For flexible_custom, also generate scaling law plots
+    if args.baseline_type == "flexible_custom":
+        # GSM8K scaling law plot
+        try:
+            fname = "gsm8k_scaling_law.png"
+            save_path = out_dir / fname
+            plot_avg_accuracy_scaling(
+                results_path=baselines_json,
+                benchmark="gsm8k",
+                save_path=save_path,
+                target_params_b=31.2,
+            )
+        except Exception as e:
+            print(f"Failed to generate GSM8K scaling law plot: {e}")
+
+        # MMLU scaling law plot - skipped as no shot data available in flexible_custom
 
     # Validation loss/perplexity plots
     out_dir = Path(str(repo_root / "results" / "scaling_laws"))
