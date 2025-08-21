@@ -1,5 +1,4 @@
 import re
-from enum import Enum
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 from datasets import load_dataset
@@ -38,31 +37,6 @@ def evaluate_mmlu_accuracy(predictions, ground_truths):
         correct += extract_answer_letter(pred) == gt
 
     return correct / total * 100 if total > 0 else 0
-
-
-class PromptType(str, Enum):
-    zero_shot = "zero_shot"
-    one_shot = "one_shot"
-    two_shot = "two_shot"
-    three_shot = "three_shot"
-    four_shot = "four_shot"
-    five_shot = "five_shot"
-
-
-def _num_shots_from_prompt_type(prompt_type: "PromptType | str") -> int:
-    mapping = {
-        "zero_shot": 0,
-        "one_shot": 1,
-        "two_shot": 2,
-        "three_shot": 3,
-        "four_shot": 4,
-        "five_shot": 5,
-    }
-    if isinstance(prompt_type, PromptType):
-        value = prompt_type.value
-    else:
-        value = str(prompt_type)
-    return mapping.get(value, 0)
 
 
 def _format_mc_question(question, choices):
@@ -105,7 +79,7 @@ def _build_few_shot_block(subject: str, by_subject: dict, k: int) -> str:
 def run_mmlu_evaluation(
     model: str,
     split: str = "test",
-    prompt_type: PromptType | str = PromptType.zero_shot,
+    num_shots: int = 0,
     temperature: float = 1.0,
     revision: str = None,
     llm: LLM = None,
@@ -115,6 +89,7 @@ def run_mmlu_evaluation(
     Args:
         model: Model path or HuggingFace model identifier
         split: Which HuggingFace split to use ("validation", "test", "dev")
+        num_shots: Number of few-shot examples (0 for zero-shot, 1 for one-shot, etc.)
         revision: Specific model revision/branch to use (for HuggingFace models)
         llm: Optional LLM instance to use. If None, creates a new one.
     """
@@ -142,7 +117,6 @@ def run_mmlu_evaluation(
     all_results = {}
     total_correct = 0
     total_questions = 0
-    num_shots = _num_shots_from_prompt_type(prompt_type)
     samples_for_shots = load_dataset(
         "cais/mmlu", "all", split=("test" if split == "dev" else "dev")
     )

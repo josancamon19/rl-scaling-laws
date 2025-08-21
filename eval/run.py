@@ -4,13 +4,15 @@ import json
 import logging
 import sys
 import time
+import gc
+import torch
 from pathlib import Path
 
 # Allow importing from the project root
 sys.path.append(str(Path(__file__).parent.parent))
 
-from eval.mmlu import run_mmlu_evaluation, PromptType as MMLUPromptType
-from eval.gsm8k import run_gsm8k_evaluation, PromptType as GSM8KPromptType
+from eval.mmlu import run_mmlu_evaluation
+from eval.gsm8k import run_gsm8k_evaluation
 from vllm import LLM
 
 
@@ -116,6 +118,50 @@ def _save_results(results: dict, output_path: Path):
     print(f"Saved results to {output_path}")
 
 
+def cleanup_vllm_resources(llm=None):
+    """Comprehensive cleanup to prevent OOM issues with vLLM"""
+    try:
+        # Delete the LLM instance if provided
+        if llm is not None:
+            # vLLM specific cleanup if available
+            if hasattr(llm, "shutdown"):
+                llm.shutdown()
+            del llm
+
+        # Force Python garbage collection
+        gc.collect()
+
+        # Clear CUDA cache multiple times to ensure memory is freed
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+
+            # Reset memory stats
+            torch.cuda.reset_peak_memory_stats()
+            torch.cuda.reset_accumulated_memory_stats()
+
+        # Additional aggressive garbage collection
+        for _ in range(3):
+            gc.collect()
+
+        # Sleep briefly to allow memory to be released
+        time.sleep(2)
+
+        print("Memory cleanup completed")
+
+        # Print memory stats if available
+        if torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated() / 1024**3
+            reserved = torch.cuda.memory_reserved() / 1024**3
+            print(
+                f"GPU memory - Allocated: {allocated:.2f}GB, Reserved: {reserved:.2f}GB"
+            )
+
+    except Exception as e:
+        print(f"Warning: Error during cleanup: {e}")
+
+
 def _model_already_evaluated(
     model_name: str, existing_results: dict, shots: list
 ) -> bool:
@@ -149,25 +195,13 @@ def _model_already_evaluated(
 ### ===== STARTS
 
 
-def _prompt_type_from_num(enum_cls, k: int):
-    mapping = {
-        0: "zero_shot",
-        1: "one_shot",
-        2: "two_shot",
-        3: "three_shot",
-        4: "four_shot",
-        5: "five_shot",
-    }
-    return enum_cls(mapping.get(k, "zero_shot"))
-
-
 def _default_models():
     return [
         "Qwen/Qwen3-0.6B-base",
-        # "Qwen/Qwen3-1.7B-base",
-        # "Qwen/Qwen3-4B-base",
-        # "Qwen/Qwen3-8B-base",
-        # "Qwen/Qwen3-14B-base",
+        "Qwen/Qwen3-1.7B-base",
+        "Qwen/Qwen3-4B-base",
+        "Qwen/Qwen3-8B-base",
+        "Qwen/Qwen3-14B-base",
     ]
 
 
@@ -223,6 +257,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run benchmarks on language models")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--shots", nargs="*", type=int, default=[0, 1, 2, 3, 4, 5])
+    parser.add_argument("--include-mmlu", action="store_true", default=False)
     args = parser.parse_args()
 
     output_path = Path(str(Path(__file__).parent / "results.json"))
@@ -291,56 +326,86 @@ def main():
             "started_at": int(time.time()),
         }
 
-        for k in args.shots:
-            # MMLU
-            # try:
-            #     mmlu_pt = _prompt_type_from_num(MMLUPromptType, k)
-            #     mmlu_res = run_mmlu_evaluation(  # TODO: MMLU should generate everything at the same time
-            #         model_id,
-            #         split="test",
-            #         prompt_type=mmlu_pt,
-            #         temperature=args.temperature,
-            #         revision=revision,
-            #         # llm=llm,
-            #     )
-            #     # Aggregate overall accuracy
-            #     total_correct = sum(v["correct"] for v in mmlu_res.values())
-            #     total_questions = sum(v["total"] for v in mmlu_res.values())
-            #     overall_acc = (
-            #         (total_correct / total_questions * 100)
-            #         if total_questions > 0
-            #         else 0.0
-            #     )
-            #     model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
-            #         "accuracy": overall_acc,
-            #         "correct": total_correct,
-            #         "total": total_questions,
-            #     }
-            # except Exception as e:
-            #     model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
-            #         "error": str(e)
-            #     }
+        # Load LLM for this model with proper error handling
+        llm = None
+        try:
+            print(f"Loading LLM for {model_name}...")
 
-            # GSM8K
-            try:
-                gsm_pt = _prompt_type_from_num(GSM8KPromptType, k)
-                gsm_res = run_gsm8k_evaluation(
-                    model_id,
-                    split="test",
-                    prompt_type=gsm_pt,
-                    temperature=args.temperature,
-                    revision=revision,
-                    # llm=llm,
-                )
-                model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                    "accuracy": gsm_res.get("accuracy"),
-                    "correct": gsm_res.get("correct"),
-                    "total": gsm_res.get("total"),
-                }
-            except Exception as e:
-                model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                    "error": str(e)
-                }
+            # Initialize vLLM with memory-efficient settings
+            llm = LLM(
+                model=model_id,
+                revision=revision,
+                tensor_parallel_size=1,
+                gpu_memory_utilization=0.85,
+                trust_remote_code=True,
+                dtype="bfloat16",
+                enforce_eager=True,  # Disable CUDA graphs to save memory
+            )
+
+            print(f"LLM loaded successfully for {model_name}")
+
+            for k in args.shots:
+                # MMLU
+                if args.include_mmlu:
+                    try:
+                        # TODO: MMLU should generate everything at the same time
+                        mmlu_res = run_mmlu_evaluation(
+                            model_id,
+                            split="test",
+                            num_shots=k,
+                            temperature=args.temperature,
+                            revision=revision,
+                            llm=llm,
+                        )
+                        # Aggregate overall accuracy
+                        total_correct = sum(v["correct"] for v in mmlu_res.values())
+                        total_questions = sum(v["total"] for v in mmlu_res.values())
+                        overall_acc = (
+                            (total_correct / total_questions * 100)
+                            if total_questions > 0
+                            else 0.0
+                        )
+                        model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
+                            "accuracy": overall_acc,
+                            "correct": total_correct,
+                            "total": total_questions,
+                        }
+                    except Exception as e:
+                        model_result["benchmarks"]["mmlu"]["by_shot"][str(k)] = {
+                            "error": str(e)
+                        }
+                        print(f"Error in MMLU evaluation for {k}-shot: {e}")
+
+                # GSM8K
+                try:
+                    gsm_res = run_gsm8k_evaluation(
+                        model_id,
+                        split="test",
+                        num_shots=k,
+                        temperature=args.temperature,
+                        revision=revision,
+                        llm=llm,
+                    )
+                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                        "accuracy": gsm_res.get("accuracy"),
+                        "correct": gsm_res.get("correct"),
+                        "total": gsm_res.get("total"),
+                    }
+                except Exception as e:
+                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                        "error": str(e)
+                    }
+                    print(f"Error in GSM8K evaluation for {k}-shot: {e}")
+
+        except Exception as e:
+            print(f"Error loading LLM for {model_name}: {e}")
+            model_result["error"] = str(e)
+
+        finally:
+            # Always cleanup LLM resources
+            print(f"Cleaning up resources for {model_name}...")
+            cleanup_vllm_resources(llm)
+            llm = None
 
         model_result["ended_at"] = int(time.time())
 

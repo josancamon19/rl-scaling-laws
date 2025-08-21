@@ -2,8 +2,6 @@ from vllm import LLM
 from vllm.sampling_params import SamplingParams
 from verl.utils.reward_score.gsm8k import compute_score
 from datasets import load_dataset
-from enum import Enum
-import re
 
 
 def evaluate_gsm8k_accuracy(predictions, ground_truths):
@@ -12,37 +10,7 @@ def evaluate_gsm8k_accuracy(predictions, ground_truths):
     return sum(scores) / len(predictions) * 100
 
 
-class PromptType(str, Enum):
-    zero_shot = "zero_shot"
-    one_shot = "one_shot"
-    two_shot = "two_shot"
-    three_shot = "three_shot"
-    four_shot = "four_shot"
-    five_shot = "five_shot"
-
-
-def _num_shots_from_prompt_type(prompt_type: "PromptType | str") -> int:
-    mapping = {
-        "zero_shot": 0,
-        "one_shot": 1,
-        "two_shot": 2,
-        "three_shot": 3,
-        "four_shot": 4,
-        "five_shot": 5,
-    }
-    if isinstance(prompt_type, PromptType):
-        value = prompt_type.value
-    else:
-        value = str(prompt_type)
-    if value in mapping:
-        return mapping[value]
-    m = re.match(r"^(\d+)_shot$", value)
-    if m:
-        return int(m.group(1))
-    raise ValueError(f"Unrecognized prompt_type: {prompt_type}")
-
-
-def _build_few_shot_prefix(num_shots: int, instruction_following: str) -> str:
+def _build_few_shot_prefix(num_shots: int) -> str:
     if num_shots <= 0:
         return ""
     # Use training split examples as demonstrations
@@ -53,14 +21,14 @@ def _build_few_shot_prefix(num_shots: int, instruction_following: str) -> str:
         ex = train_ds[i]
         ex_q = ex["question"].strip()
         ex_a = ex["answer"].strip()
-        lines.append(f"Q: {ex_q} {instruction_following}\nA: {ex_a}\n")
+        lines.append(f"Question: {ex_q}\nAnswer: {ex_a}\n")
     return "\n".join(lines) + "\n"
 
 
 def run_gsm8k_evaluation(
     model: str,
     split: str = "test",
-    prompt_type: PromptType = PromptType.zero_shot,
+    num_shots: int = 0,
     temperature: float = 1.0,
     revision: str = None,
     llm: LLM = None,
@@ -70,7 +38,7 @@ def run_gsm8k_evaluation(
     Args:
         model: Model path or HuggingFace model identifier
         split: Which split to use ("test" or "train")
-        prompt_type: Prompt construction style: zero_shot, one_shot, two_shot, ...
+        num_shots: Number of few-shot examples (0 for zero-shot, 1 for one-shot, etc.)
         revision: Specific model revision/branch to use (for HuggingFace models)
         llm: Optional LLM instance to use. If None, creates a new one.
     """
@@ -98,14 +66,13 @@ def run_gsm8k_evaluation(
     instruction_following = (
         'Let\'s think step by step and output the final answer after "####".'
     )
-    num_shots = _num_shots_from_prompt_type(prompt_type)
-    few_shot_prefix = _build_few_shot_prefix(num_shots, instruction_following)
+    few_shot_prefix = _build_few_shot_prefix(num_shots)
 
     for question in questions:
         if num_shots == 0:
             prompts.append(f"{question} {instruction_following}")
         else:
-            prompt = f"{few_shot_prefix}Q: {question} {instruction_following}\nA: "
+            prompt = f"{few_shot_prefix}\nQuestion: {question}\n{instruction_following}\nAnswer: "
             prompts.append(prompt)
 
     # print(f"Prompt Example [0]:\n{prompts[0]}")
