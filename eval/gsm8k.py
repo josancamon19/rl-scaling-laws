@@ -1,41 +1,16 @@
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
-from verl.utils.reward_score.gsm8k import compute_score
+
+from rl.custom_gsm8k_reward import compute_score
 from datasets import load_dataset
-import re
 
 
 def evaluate_gsm8k_accuracy(predictions, ground_truths):
     scores = [
-        custom_flexible(pred, gt)
-        # compute_score(pred, gt, "flexible")
+        compute_score(None, pred, gt, {"method": "custom_flexible"})
         for pred, gt in zip(predictions, ground_truths)
     ]
     return sum(scores) / len(predictions) * 100
-
-
-def custom_flexible(solution_str, ground_truth):
-    # Find the first occurrence of "#### "
-    marker_pos = solution_str.find("#### ")
-
-    if marker_pos != -1:
-        # Get from start up to marker position + 5 more characters
-        end_pos = marker_pos + 10
-        solution_str = solution_str[: min(len(solution_str), end_pos)]
-
-    if len(solution_str) > 300:
-        solution_str = solution_str[-300:]
-
-    answer = re.findall("(\\-?[0-9\\.\\,]+)", solution_str)
-    final_answer = None
-    if len(answer) == 0:
-        return False
-
-    invalid_str = ["", "."]
-    for final_answer in reversed(answer):
-        if final_answer not in invalid_str:
-            break
-    return final_answer == ground_truth
 
 
 def _build_few_shot_prefix(num_shots: int) -> str:
