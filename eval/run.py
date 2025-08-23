@@ -120,50 +120,52 @@ def _save_results(results: dict, output_path: Path):
 
 
 def _save_gsm8k_samples(
-    model_name: str, 
-    num_shots: int, 
-    prompts: List[str], 
-    ground_truths: List[str], 
+    model_name: str,
+    num_shots: int,
+    prompts: List[str],
+    ground_truths: List[str],
     responses: List[str],
-    output_dir: Path = None
+    output_dir: Path = None,
 ):
     """Save random samples of GSM8K evaluation results to a text file"""
     if output_dir is None:
         output_dir = Path(__file__).parent / "samples"
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Clean model name for filename
     clean_model_name = model_name.replace("/", "_").replace("-", "_")
     filename = f"gsm8k_samples_{clean_model_name}_{num_shots}shot.txt"
     output_path = output_dir / filename
-    
+
     # Select random samples (up to 10)
     num_samples = min(10, len(prompts))
     indices = random.sample(range(len(prompts)), num_samples)
-    
+
     with output_path.open("w") as f:
         f.write(f"GSM8K Samples for {model_name} - {num_shots}-shot\n")
         f.write(f"{'=' * 80}\n\n")
-        f.write(f"Total samples: {num_samples} (randomly selected from {len(prompts)})\n\n")
-        
+        f.write(
+            f"Total samples: {num_samples} (randomly selected from {len(prompts)})\n\n"
+        )
+
         for i, idx in enumerate(indices):
-            f.write(f"Sample {i+1}/{num_samples} (Index: {idx})\n")
+            f.write(f"Sample {i + 1}/{num_samples} (Index: {idx})\n")
             f.write(f"{'-' * 80}\n\n")
-            
+
             f.write("PROMPT:\n")
             f.write(prompts[idx])
             f.write("\n\n")
-            
+
             f.write("EXPECTED ANSWER:\n")
             f.write(ground_truths[idx])
             f.write("\n\n")
-            
+
             f.write("MODEL RESPONSE:\n")
             f.write(responses[idx])
             f.write("\n\n")
-            
+
             f.write(f"{'=' * 80}\n\n")
-    
+
     print(f"Saved {num_samples} samples to {output_path}")
 
 
@@ -247,10 +249,10 @@ def _model_already_evaluated(
 def _default_models():
     return [
         "Qwen/Qwen3-0.6B-base",
-        "Qwen/Qwen3-1.7B-base",
-        "Qwen/Qwen3-4B-base",
-        "Qwen/Qwen3-8B-base",
-        "Qwen/Qwen3-14B-base",
+        # "Qwen/Qwen3-1.7B-base",
+        # "Qwen/Qwen3-4B-base",
+        # "Qwen/Qwen3-8B-base",
+        # "Qwen/Qwen3-14B-base",
     ]
 
 
@@ -258,9 +260,16 @@ def _build_model_list(
     include_grpo: bool,
     grpo_only: bool,
     grpo_username: str,
-    max_grpo_checkpoints: int = None,
+    last_checkpoint_only: bool = False,
 ):
-    """Build list of models to evaluate based on arguments."""
+    """Build list of models to evaluate based on arguments.
+
+    Args:
+        include_grpo: Whether to include GRPO model variants
+        grpo_only: Whether to only evaluate GRPO models (exclude base models)
+        grpo_username: HuggingFace username for GRPO models
+        last_checkpoint_only: If True, only evaluate the last checkpoint (highest step) for each GRPO model
+    """
     models = []
     base_models = _default_models()
 
@@ -275,12 +284,13 @@ def _build_model_list(
             grpo_variants = get_grpo_model_variants(base_model, grpo_username)
             print("found grpo_variants", len(grpo_variants))
 
-            # Limit number of checkpoints if specified
-            if max_grpo_checkpoints and len(grpo_variants) > max_grpo_checkpoints:
+            # If last_checkpoint_only, find the variant with the highest step
+            if last_checkpoint_only and grpo_variants:
+                max_step_variant = max(grpo_variants, key=lambda v: v["step"])
+                grpo_variants = [max_step_variant]
                 print(
-                    f"Limiting to {max_grpo_checkpoints} checkpoints for {base_model}"
+                    f"Using only last checkpoint with step {max_step_variant['step']}"
                 )
-                grpo_variants = grpo_variants[:max_grpo_checkpoints]
 
             for variant in grpo_variants:
                 # Create a model entry that includes revision info
@@ -292,6 +302,7 @@ def _build_model_list(
                     "checkpoint": variant["checkpoint"],
                     "step": variant["step"],
                 }
+                print(model_entry)
                 models.append(model_entry)
 
     return models
@@ -333,10 +344,9 @@ def main():
         }
 
     model_list = _build_model_list(
-        include_grpo=False,
-        grpo_only=False,
+        include_grpo=True,
         grpo_username="josancamon",
-        max_grpo_checkpoints=None,
+        last_checkpoint_only=True,
     )
 
     for model_item in model_list:
@@ -441,7 +451,7 @@ def main():
                         "correct": gsm_res.get("correct"),
                         "total": gsm_res.get("total"),
                     }
-                    
+
                     # Save samples if requested
                     if args.keep_samples and "prompts" in gsm_res:
                         _save_gsm8k_samples(
@@ -449,9 +459,9 @@ def main():
                             num_shots=k,
                             prompts=gsm_res["prompts"],
                             ground_truths=gsm_res["ground_truths"],
-                            responses=gsm_res["responses"]
+                            responses=gsm_res["responses"],
                         )
-                        
+
                 except Exception as e:
                     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
                         "error": str(e)

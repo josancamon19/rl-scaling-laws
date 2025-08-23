@@ -58,6 +58,56 @@
       "ended_at": 1755804837
     },
     {
+      "model": "qwen3-0.6b-grpo-global_step_72",
+      "model_id": "josancamon/qwen3-0.6b-grpo-gsm8k",
+      "metadata": {
+        "base_model": "qwen3-0.6b",
+        "checkpoint": "global_step_72",
+        "revision": "global-step-72"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 69.0674753601213,
+              "correct": 911,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 59.74222896133434,
+              "correct": 788,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 61.41015921152388,
+              "correct": 810,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 62.4715693707354,
+              "correct": 824,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 63.38134950720242,
+              "correct": 836,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 62.1683093252464,
+              "correct": 820,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755922045,
+      "ended_at": 1755922173
+    },
+    {
       "model": "Qwen/Qwen3-1.7B-base",
       "model_id": "Qwen/Qwen3-1.7B-base",
       "metadata": {},
