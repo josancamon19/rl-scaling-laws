@@ -56,7 +56,8 @@ if __name__ == "__main__":
             answer_raw = example.pop("answer")
             solution = extract_solution(answer_raw)
             data = {
-                "data_source": data_source,
+                # "data_source": data_source,
+                "data_source": "custom/gsm8k", # avoid default reward
                 "prompt": [
                     {
                         "role": "user",

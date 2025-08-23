@@ -94,12 +94,12 @@ except Exception as e:
 )
 
 # Enable offline mode to prevent API calls after model is cached
-# export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
-# export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
-# export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
-# export VLLM_USE_MODELSCOPE=false  # Prevent VLLM from checking ModelScope
-# export HF_HUB_DISABLE_TELEMETRY=1  # Disable telemetry to reduce connections
-# export VLLM_SKIP_TOKENIZER_DOWNLOAD=1  # Prevent vLLM from trying to download additional files
+export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
+export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
+export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
+export VLLM_USE_MODELSCOPE=false  # Prevent VLLM from checking ModelScope
+export HF_HUB_DISABLE_TELEMETRY=1  # Disable telemetry to reduce connections
+export VLLM_SKIP_TOKENIZER_DOWNLOAD=1  # Prevent vLLM from trying to download additional files
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
@@ -128,7 +128,7 @@ ARGS=(
   # grpo is just ppo with a diff way of estimating adv, thus is considered still ppo in verl
   algorithm.adv_estimator=grpo
   # basic node config
-  trainer.n_gpus_per_node=1
+  trainer.n_gpus_per_node=8
   trainer.nnodes=1
   trainer.save_freq=25
   trainer.test_freq=4 # for 7B, 1 for 14B, 4 for all else
@@ -147,7 +147,7 @@ ARGS=(
   # This provides more flexible answer matching (see rl/custom_gsm8k_reward.py)
   # Evaluation method can be set as 4th argument: strict, flexible, or custom_flexible
   reward_model.reward_manager=naive
-  "custom_reward_function.path=${ROOT_DIR}/rl/custom_gsm8k_reward.py"
+  "custom_reward_function.path=${ROOT_DIR}/utils/custom_gsm8k_reward.py"
   custom_reward_function.name=compute_score # Defaults to custom_flexible
   # batch settings
   trainer.total_epochs=4 # passes over the data

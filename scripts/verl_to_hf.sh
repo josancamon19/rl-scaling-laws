@@ -45,11 +45,11 @@ for model_dir in "$CHECKPOINT_DIR"/*; do
                 mkdir -p "$target_dir"
                 
                 # Check if already merged
-                if [ -f "$target_dir/model.safetensors" ] || [ -f "$target_dir/model.safetensors.index.json" ]; then
-                    echo "    Already merged at: $target_dir"
-                    echo "    Skipping..."
-                    continue
-                fi
+                # if [ -f "$target_dir/model.safetensors" ] || [ -f "$target_dir/model.safetensors.index.json" ]; then
+                #     echo "    Already merged at: $target_dir"
+                #     echo "    Skipping..."
+                #     continue
+                # fi
                 
                 # Run the merge command
                 echo "    Merging FSDP checkpoint to HuggingFace format..."

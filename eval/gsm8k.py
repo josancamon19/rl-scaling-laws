@@ -1,7 +1,7 @@
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 
-from rl.custom_gsm8k_reward import compute_score
+from utils.custom_gsm8k_reward import compute_score
 from datasets import load_dataset
 
 
