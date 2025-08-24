@@ -395,13 +395,13 @@ def main():
 
     # Configure model list directly here
     model_list = _build_model_list(
-        include_grpo=False,
-        grpo_only=False,
+        include_grpo=True,
+        grpo_only=True,
         last_checkpoint_only=True,
-        # additional_models=[
-        #     "josancamon/qwen3-0-6b-grpo-flexible-with-format",
-        #     "josancamon/qwen3-0-6b-grpo-flexible",
-        # ],
+        additional_models=[
+            "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+            "josancamon/qwen3-0-6b-grpo-flexible",
+        ],
     )
 
     print(model_list)
