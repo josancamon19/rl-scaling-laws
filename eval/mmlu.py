@@ -124,8 +124,13 @@ def run_mmlu_evaluation(
         _build_subject_support_map(samples_for_shots) if num_shots > 0 else {}
     )
 
-    for i, (subject, data) in enumerate(subjects_data.items()):
-        print(f"\nEvaluating {subject}...")
+    # Collect all prompts and metadata for batch processing
+    all_prompts = []
+    prompt_metadata = []  # Track (subject_idx, question_idx) for each prompt
+    subject_list = list(subjects_data.keys())
+    
+    print("Preparing prompts for all subjects...")
+    for subject_idx, (subject, data) in enumerate(subjects_data.items()):
         questions = data["questions"]
         choices = data["choices"]
         answers = data["answers"]
@@ -134,43 +139,64 @@ def run_mmlu_evaluation(
             print(f"No valid questions found for {subject}")
             continue
 
-        prompts = []
         few_shot_block = _build_few_shot_block(subject, support_by_subject, num_shots)
-        for question, choice_list in zip(questions, choices):
-            # five_shot prompt could be better
+        for question_idx, (question, choice_list) in enumerate(zip(questions, choices)):
             formatted = _format_mc_question(question, choice_list)
             instruction = f'Answer the following multiple choice question about {subject}. Respond with a single sentence of the form "The correct answer is _", filling the blank with the letter corresponding to the correct answer (i.e., A, B, C or D).\n\n'
             if few_shot_block:
                 instruction += f"{few_shot_block}\n\n"
 
             instruction += f"Q: {formatted}\nA: "
-            prompts.append(instruction)
-        if i == 0:
-            print(f"Subject {subject} sample prompt [0]:\n{prompts[0]}")
-        # Generate responses
-        sampling_params = SamplingParams(
-            temperature=temperature,
-            top_p=1.0,
-            max_tokens=256,
-            stop=None,
-        )
-
-        outputs = llm.generate(prompts, sampling_params)
-        responses = [output.outputs[0].text for output in outputs]
-        if i == 0:
-            print(
-                f"Subject {subject} sample response [0]:\n{responses[0]}\nGround Truth:{answers[0]}"
-            )
-
+            all_prompts.append(instruction)
+            prompt_metadata.append((subject_idx, question_idx))
+    
+    # Show sample prompt
+    if all_prompts:
+        first_subject = subject_list[0]
+        print(f"\nSample prompt (from {first_subject}):\n{all_prompts[0]}")
+    
+    # Generate all responses in a single batch
+    print(f"\nGenerating responses for {len(all_prompts)} questions...")
+    sampling_params = SamplingParams(
+        temperature=temperature,
+        top_p=1.0,
+        max_tokens=256,
+        stop=None,
+    )
+    
+    outputs = llm.generate(all_prompts, sampling_params)
+    all_responses = [output.outputs[0].text for output in outputs]
+    
+    # Show sample response
+    if all_responses and subject_list:
+        first_subject = subject_list[0]
+        first_answer = subjects_data[first_subject]["answers"][0]
+        print(f"\nSample response (from {first_subject}):\n{all_responses[0]}\nGround Truth: {first_answer}")
+    
+    # Organize responses back by subject
+    print("\nEvaluating results by subject...")
+    for subject_idx, (subject, data) in enumerate(subjects_data.items()):
+        questions = data["questions"]
+        answers = data["answers"]
+        
+        if not questions:
+            continue
+            
+        # Extract responses for this subject
+        subject_responses = []
+        for i, (s_idx, q_idx) in enumerate(prompt_metadata):
+            if s_idx == subject_idx:
+                subject_responses.append(all_responses[i])
+        
         # Evaluate accuracy
-        accuracy = evaluate_mmlu_accuracy(responses, answers)
+        accuracy = evaluate_mmlu_accuracy(subject_responses, answers)
         correct_count = int(accuracy * len(answers) / 100)
 
         all_results[subject] = {
             "accuracy": accuracy,
             "correct": correct_count,
             "total": len(answers),
-            "responses": responses,
+            "responses": subject_responses,
             "ground_truths": answers,
         }
 

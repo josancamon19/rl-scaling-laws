@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from eval.mmlu import run_mmlu_evaluation
 from eval.gsm8k import run_gsm8k_evaluation
+from eval.math import run_math_evaluation
 from vllm import LLM
 
 
@@ -220,7 +221,7 @@ def cleanup_vllm_resources(llm=None):
 
 
 def _model_already_evaluated(
-    model_name: str, existing_results: dict, shots: list
+    model_name: str, existing_results: dict, shots: list, include_math: bool = False
 ) -> bool:
     """Check if a model has already been evaluated for all required shots"""
     if not existing_results or "models" not in existing_results:
@@ -235,6 +236,9 @@ def _model_already_evaluated(
             gsm8k_shots = (
                 model_result.get("benchmarks", {}).get("gsm8k", {}).get("by_shot", {})
             )
+            math_shots = (
+                model_result.get("benchmarks", {}).get("math", {}).get("by_shot", {})
+            )
 
             for shot in shots:
                 shot_str = str(shot)
@@ -245,6 +249,13 @@ def _model_already_evaluated(
                     or "error" in gsm8k_shots.get(shot_str, {})
                 ):
                     return False
+
+                # Check MATH only for 0-shot if include_math is True
+                if include_math and shot == 0:
+                    if shot_str not in math_shots or "error" in math_shots.get(
+                        shot_str, {}
+                    ):
+                        return False
             return True
     return False
 
@@ -317,19 +328,21 @@ def _build_model_list(
     if additional_models:
         for model_id in additional_models:
             print(f"\nProcessing additional model: {model_id}")
-            
+
             # Check if this model has checkpoints
             checkpoints = get_model_checkpoints(model_id)
-            
+
             if checkpoints:
                 print(f"Found {len(checkpoints)} checkpoints for {model_id}")
-                
+
                 # If last_checkpoint_only, only use the highest step
                 if last_checkpoint_only:
                     max_checkpoint = max(checkpoints, key=lambda x: x["step"])
                     checkpoints = [max_checkpoint]
-                    print(f"Using only last checkpoint with step {max_checkpoint['step']}")
-                
+                    print(
+                        f"Using only last checkpoint with step {max_checkpoint['step']}"
+                    )
+
                 # Add each checkpoint as a separate model entry
                 for checkpoint in checkpoints:
                     model_entry = {
@@ -366,8 +379,9 @@ logging.getLogger("vllm").setLevel(logging.ERROR)
 def main():
     parser = argparse.ArgumentParser(description="Run benchmarks on language models")
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--shots", nargs="*", type=int, default=[0, 1, 2, 3, 4, 5])
+    parser.add_argument("--shots", nargs="*", type=int, default=[0])  # , 1, 2, 3, 4, 5
     parser.add_argument("--include-mmlu", action="store_true", default=False)
+    parser.add_argument("--include-math", action="store_true", default=False)
     parser.add_argument("--keep-samples", action="store_true", default=True)
     args = parser.parse_args()
 
@@ -389,6 +403,7 @@ def main():
             "shots": args.shots,
             "mmlu_split": "test",
             "gsm8k_split": "test",
+            "math_split": "validation",
             "models": [],
             "started_at": int(time.time()),
         }
@@ -398,13 +413,12 @@ def main():
         include_grpo=True,
         grpo_only=True,
         last_checkpoint_only=True,
-        additional_models=[
-            "josancamon/qwen3-0-6b-grpo-flexible-with-format",
-            "josancamon/qwen3-0-6b-grpo-flexible",
-        ],
+        # additional_models=[
+        #     "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+        #     "josancamon/qwen3-0-6b-grpo-flexible",
+        # ],
     )
-
-    print(model_list)
+    print("model_list", model_list)
 
     for model_item in model_list:
         # Handle both simple string models and complex model entries
@@ -424,7 +438,9 @@ def main():
             }
 
         # Skip if model already evaluated
-        if _model_already_evaluated(model_name, existing_results, args.shots):
+        if _model_already_evaluated(
+            model_name, existing_results, args.shots, args.include_math
+        ):
             print(f"Skipping {model_name} - already evaluated")
             continue
 
@@ -439,6 +455,7 @@ def main():
             "benchmarks": {
                 "mmlu": {"by_shot": {}},
                 "gsm8k": {"by_shot": {}},
+                "math": {"by_shot": {}},
             },
             "started_at": int(time.time()),
         }
@@ -465,7 +482,6 @@ def main():
                 # MMLU
                 if args.include_mmlu:
                     try:
-                        # TODO: MMLU should generate everything at the same time
                         mmlu_res = run_mmlu_evaluation(
                             model_id,
                             split="test",
@@ -494,36 +510,58 @@ def main():
                         print(f"Error in MMLU evaluation for {k}-shot: {e}")
 
                 # GSM8K
-                try:
-                    gsm_res = run_gsm8k_evaluation(
-                        model_id,
-                        split="test",
-                        num_shots=k,
-                        temperature=args.temperature,
-                        revision=revision,
-                        llm=llm,
-                    )
-                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                        "accuracy": gsm_res.get("accuracy"),
-                        "correct": gsm_res.get("correct"),
-                        "total": gsm_res.get("total"),
-                    }
+                # try:
+                #     gsm_res = run_gsm8k_evaluation(
+                #         model_id,
+                #         split="test",
+                #         num_shots=k,
+                #         temperature=args.temperature,
+                #         revision=revision,
+                #         llm=llm,
+                #     )
+                #     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                #         "accuracy": gsm_res.get("accuracy"),
+                #         "correct": gsm_res.get("correct"),
+                #         "total": gsm_res.get("total"),
+                #     }
 
-                    # Save samples if requested
-                    if args.keep_samples and "prompts" in gsm_res:
-                        _save_gsm8k_samples(
-                            model_name=model_name,
-                            num_shots=k,
-                            prompts=gsm_res["prompts"],
-                            ground_truths=gsm_res["ground_truths"],
-                            responses=gsm_res["responses"],
+                #     # Save samples if requested
+                #     if args.keep_samples and "prompts" in gsm_res:
+                #         _save_gsm8k_samples(
+                #             model_name=model_name,
+                #             num_shots=k,
+                #             prompts=gsm_res["prompts"],
+                #             ground_truths=gsm_res["ground_truths"],
+                #             responses=gsm_res["responses"],
+                #         )
+
+                # except Exception as e:
+                #     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                #         "error": str(e)
+                #     }
+                #     print(f"Error in GSM8K evaluation for {k}-shot: {e}")
+
+                # MATH (only supports 0-shot)
+                if args.include_math and k == 0:
+                    try:
+                        math_res = run_math_evaluation(
+                            model_id,
+                            split="validation",
+                            temperature=args.temperature,
+                            revision=revision,
+                            llm=llm,
                         )
-
-                except Exception as e:
-                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                        "error": str(e)
-                    }
-                    print(f"Error in GSM8K evaluation for {k}-shot: {e}")
+                        model_result["benchmarks"]["math"]["by_shot"][str(k)] = {
+                            "accuracy": math_res.get("accuracy"),
+                            "correct": math_res.get("correct"),
+                            "total": math_res.get("total"),
+                            "subject_stats": math_res.get("subject_stats"),
+                        }
+                    except Exception as e:
+                        model_result["benchmarks"]["math"]["by_shot"][str(k)] = {
+                            "error": str(e)
+                        }
+                        print(f"Error in MATH evaluation: {e}")
 
         except Exception as e:
             print(f"Error loading LLM for {model_name}: {e}")

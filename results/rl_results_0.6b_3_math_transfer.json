@@ -1,0 +1,241 @@
+{
+  "temperature": 0.0,
+  "shots": [
+    0
+  ],
+  "mmlu_split": "test",
+  "gsm8k_split": "test",
+  "math_split": "validation",
+  "models": [
+    {
+      "model": "Qwen/Qwen3-0.6B-base",
+      "model_id": "Qwen/Qwen3-0.6B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {}
+        },
+        "math": {
+          "by_shot": {
+            "0": {
+              "accuracy": 25.259999999999998,
+              "correct": 1262,
+              "total": 5000,
+              "subject_stats": {
+                "Prealgebra": {
+                  "correct": 329,
+                  "total": 871
+                },
+                "Precalculus": {
+                  "correct": 38,
+                  "total": 546
+                },
+                "Geometry": {
+                  "correct": 87,
+                  "total": 479
+                },
+                "Intermediate Algebra": {
+                  "correct": 120,
+                  "total": 903
+                },
+                "Counting & Probability": {
+                  "correct": 91,
+                  "total": 474
+                },
+                "Algebra": {
+                  "correct": 491,
+                  "total": 1187
+                },
+                "Number Theory": {
+                  "correct": 107,
+                  "total": 540
+                }
+              }
+            }
+          }
+        }
+      },
+      "started_at": 1755998728,
+      "ended_at": 1755998837
+    },
+    {
+      "model": "qwen3-0-6b-grpo-flexible-with-format-global_step_56",
+      "model_id": "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+      "metadata": {
+        "base_model": "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+        "checkpoint": "global_step_56",
+        "revision": "global-step-56"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {}
+        },
+        "math": {
+          "by_shot": {
+            "0": {
+              "accuracy": 33.800000000000004,
+              "correct": 1690,
+              "total": 5000,
+              "subject_stats": {
+                "Prealgebra": {
+                  "correct": 421,
+                  "total": 871
+                },
+                "Precalculus": {
+                  "correct": 47,
+                  "total": 546
+                },
+                "Geometry": {
+                  "correct": 97,
+                  "total": 479
+                },
+                "Intermediate Algebra": {
+                  "correct": 150,
+                  "total": 903
+                },
+                "Counting & Probability": {
+                  "correct": 132,
+                  "total": 474
+                },
+                "Algebra": {
+                  "correct": 641,
+                  "total": 1187
+                },
+                "Number Theory": {
+                  "correct": 202,
+                  "total": 540
+                }
+              }
+            }
+          }
+        }
+      },
+      "started_at": 1755998837,
+      "ended_at": 1755998943
+    },
+    {
+      "model": "qwen3-0-6b-grpo-flexible-global_step_56",
+      "model_id": "josancamon/qwen3-0-6b-grpo-flexible",
+      "metadata": {
+        "base_model": "josancamon/qwen3-0-6b-grpo-flexible",
+        "checkpoint": "global_step_56",
+        "revision": "global-step-56"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {}
+        },
+        "math": {
+          "by_shot": {
+            "0": {
+              "accuracy": 33.76,
+              "correct": 1688,
+              "total": 5000,
+              "subject_stats": {
+                "Prealgebra": {
+                  "correct": 420,
+                  "total": 871
+                },
+                "Precalculus": {
+                  "correct": 52,
+                  "total": 546
+                },
+                "Geometry": {
+                  "correct": 96,
+                  "total": 479
+                },
+                "Intermediate Algebra": {
+                  "correct": 141,
+                  "total": 903
+                },
+                "Counting & Probability": {
+                  "correct": 127,
+                  "total": 474
+                },
+                "Algebra": {
+                  "correct": 657,
+                  "total": 1187
+                },
+                "Number Theory": {
+                  "correct": 195,
+                  "total": 540
+                }
+              }
+            }
+          }
+        }
+      },
+      "started_at": 1755998943,
+      "ended_at": 1755999050
+    },
+    {
+      "model": "qwen3-0.6b-grpo-global_step_72",
+      "model_id": "josancamon/qwen3-0.6b-grpo-gsm8k",
+      "metadata": {
+        "base_model": "qwen3-0.6b",
+        "checkpoint": "global_step_72",
+        "revision": "global-step-72"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {}
+        },
+        "math": {
+          "by_shot": {
+            "0": {
+              "accuracy": 31.619999999999997,
+              "correct": 1581,
+              "total": 5000,
+              "subject_stats": {
+                "Prealgebra": {
+                  "correct": 411,
+                  "total": 871
+                },
+                "Precalculus": {
+                  "correct": 48,
+                  "total": 546
+                },
+                "Geometry": {
+                  "correct": 96,
+                  "total": 479
+                },
+                "Intermediate Algebra": {
+                  "correct": 130,
+                  "total": 903
+                },
+                "Counting & Probability": {
+                  "correct": 119,
+                  "total": 474
+                },
+                "Algebra": {
+                  "correct": 603,
+                  "total": 1187
+                },
+                "Number Theory": {
+                  "correct": 174,
+                  "total": 540
+                }
+              }
+            }
+          }
+        }
+      },
+      "started_at": 1755999245,
+      "ended_at": 1755999350
+    }
+  ],
+  "started_at": 1755998727,
+  "ended_at": 1755999050
+}

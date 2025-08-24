@@ -1,0 +1,105 @@
+{
+  "temperature": 0.0,
+  "shots": [
+    0
+  ],
+  "mmlu_split": "test",
+  "gsm8k_split": "test",
+  "models": [
+    {
+      "model": "Qwen/Qwen3-0.6B-base",
+      "model_id": "Qwen/Qwen3-0.6B-base",
+      "metadata": {},
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 41.11237715425153,
+              "correct": 5773,
+              "total": 14042
+            }
+          }
+        }
+      },
+      "started_at": 1755996960,
+      "ended_at": 1755997554
+    },
+    {
+      "model": "qwen3-0.6b-grpo-global_step_72",
+      "model_id": "josancamon/qwen3-0.6b-grpo-gsm8k",
+      "metadata": {
+        "base_model": "qwen3-0.6b",
+        "checkpoint": "global_step_72",
+        "revision": "global-step-72"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 41.38299387551631,
+              "correct": 5811,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {}
+        }
+      },
+      "started_at": 1755998019,
+      "ended_at": 1755998046
+    },
+    {
+      "model": "qwen3-0-6b-grpo-flexible-with-format-global_step_56",
+      "model_id": "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+      "metadata": {
+        "base_model": "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+        "checkpoint": "global_step_56",
+        "revision": "global-step-56"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 41.54678820680815,
+              "correct": 5834,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {}
+        }
+      },
+      "started_at": 1755998046,
+      "ended_at": 1755998072
+    },
+    {
+      "model": "qwen3-0-6b-grpo-flexible-global_step_56",
+      "model_id": "josancamon/qwen3-0-6b-grpo-flexible",
+      "metadata": {
+        "base_model": "josancamon/qwen3-0-6b-grpo-flexible",
+        "checkpoint": "global_step_56",
+        "revision": "global-step-56"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {
+            "0": {
+              "accuracy": 41.50405925081897,
+              "correct": 5828,
+              "total": 14042
+            }
+          }
+        },
+        "gsm8k": {
+          "by_shot": {}
+        }
+      },
+      "started_at": 1755998072,
+      "ended_at": 1755998098
+    }
+  ],
+  "started_at": 1755995042,
+  "ended_at": 1755998098
+}
