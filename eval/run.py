@@ -53,14 +53,8 @@ def get_available_grpo_checkpoints(repo_id: str) -> List[Dict[str, str]]:
     return global_step_branches
 
 
-def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
-    match = re.search(r"Qwen3-(\d+(?:\.\d+)?[BM])", original_model, re.IGNORECASE)
-    size = match.group(1).lower().replace("B", "b").replace("M", "m")
-
-    base_model = f"qwen3-{size}"
-    repo_id = f"{username}/{base_model}-grpo-gsm8k"
-    print("get_grpo_model_variants grpo_repo_id:", repo_id)
-
+def get_model_checkpoints(repo_id: str):
+    """Get all checkpoints (branches with global-step-*) for a given model repository."""
     api = HfApi()
     try:
         refs = api.list_repo_refs(repo_id, repo_type="model")
@@ -84,6 +78,18 @@ def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
                 )
 
     checkpoints.sort(key=lambda x: x["step"])
+    return checkpoints
+
+
+def get_grpo_model_variants(original_model: str, username: str = "josancamon"):
+    match = re.search(r"Qwen3-(\d+(?:\.\d+)?[BM])", original_model, re.IGNORECASE)
+    size = match.group(1).lower().replace("B", "b").replace("M", "m")
+
+    base_model = f"qwen3-{size}"
+    repo_id = f"{username}/{base_model}-grpo-gsm8k"
+    print("get_grpo_model_variants grpo_repo_id:", repo_id)
+
+    checkpoints = get_model_checkpoints(repo_id)
     print(f"Found {len(checkpoints)} GRPO checkpoints for {repo_id}")
 
     variants = []
@@ -259,8 +265,9 @@ def _default_models():
 def _build_model_list(
     include_grpo: bool,
     grpo_only: bool,
-    grpo_username: str,
+    grpo_username: str = "josancamon",
     last_checkpoint_only: bool = False,
+    additional_models: list = None,
 ):
     """Build list of models to evaluate based on arguments.
 
@@ -269,6 +276,7 @@ def _build_model_list(
         grpo_only: Whether to only evaluate GRPO models (exclude base models)
         grpo_username: HuggingFace username for GRPO models
         last_checkpoint_only: If True, only evaluate the last checkpoint (highest step) for each GRPO model
+        additional_models: List of additional model IDs to evaluate
     """
     models = []
     base_models = _default_models()
@@ -303,6 +311,48 @@ def _build_model_list(
                     "step": variant["step"],
                 }
                 print(model_entry)
+                models.append(model_entry)
+
+    # Process additional models
+    if additional_models:
+        for model_id in additional_models:
+            print(f"\nProcessing additional model: {model_id}")
+            
+            # Check if this model has checkpoints
+            checkpoints = get_model_checkpoints(model_id)
+            
+            if checkpoints:
+                print(f"Found {len(checkpoints)} checkpoints for {model_id}")
+                
+                # If last_checkpoint_only, only use the highest step
+                if last_checkpoint_only:
+                    max_checkpoint = max(checkpoints, key=lambda x: x["step"])
+                    checkpoints = [max_checkpoint]
+                    print(f"Using only last checkpoint with step {max_checkpoint['step']}")
+                
+                # Add each checkpoint as a separate model entry
+                for checkpoint in checkpoints:
+                    model_entry = {
+                        "model_id": model_id,
+                        "revision": checkpoint["branch"],
+                        "display_name": f"{model_id.split('/')[-1]}-{checkpoint['checkpoint_name']}",
+                        "base_model": model_id,
+                        "checkpoint": checkpoint["checkpoint_name"],
+                        "step": checkpoint["step"],
+                    }
+                    print(f"Adding checkpoint: {model_entry['display_name']}")
+                    models.append(model_entry)
+            else:
+                # No checkpoints found, add the model as-is (main branch)
+                print(f"No checkpoints found, using main branch")
+                model_entry = {
+                    "model_id": model_id,
+                    "revision": None,
+                    "display_name": model_id.split("/")[-1],
+                    "base_model": model_id,
+                    "checkpoint": "main",
+                    "step": 0,
+                }
                 models.append(model_entry)
 
     return models
@@ -343,11 +393,18 @@ def main():
             "started_at": int(time.time()),
         }
 
+    # Configure model list directly here
     model_list = _build_model_list(
-        include_grpo=True,
-        grpo_username="josancamon",
+        include_grpo=False,
+        grpo_only=False,
         last_checkpoint_only=True,
+        # additional_models=[
+        #     "josancamon/qwen3-0-6b-grpo-flexible-with-format",
+        #     "josancamon/qwen3-0-6b-grpo-flexible",
+        # ],
     )
+
+    print(model_list)
 
     for model_item in model_list:
         # Handle both simple string models and complex model entries
