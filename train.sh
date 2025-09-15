@@ -94,12 +94,12 @@ except Exception as e:
 )
 
 # Enable offline mode to prevent API calls after model is cached
-export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
-export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
-export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
-export VLLM_USE_MODELSCOPE=false  # Prevent VLLM from checking ModelScope
-export HF_HUB_DISABLE_TELEMETRY=1  # Disable telemetry to reduce connections
-export VLLM_SKIP_TOKENIZER_DOWNLOAD=1  # Prevent vLLM from trying to download additional files
+# export HF_HUB_OFFLINE=1  # Use cached models only, don't check online
+# export TRANSFORMERS_OFFLINE=1  # Prevent transformers from checking online
+# export HF_DATASETS_OFFLINE=1  # Prevent datasets from checking online
+# export VLLM_USE_MODELSCOPE=false  # Prevent VLLM from checking ModelScope
+# export HF_HUB_DISABLE_TELEMETRY=1  # Disable telemetry to reduce connections
+# export VLLM_SKIP_TOKENIZER_DOWNLOAD=1  # Prevent vLLM from trying to download additional files
 
 # Detect JSONL and convert to Parquet if needed
 ALT_DATA_DIR="${ROOT_DIR}/data"
@@ -130,7 +130,7 @@ ARGS=(
   # basic node config
   trainer.n_gpus_per_node=8
   trainer.nnodes=1
-  trainer.save_freq=25
+  trainer.save_freq=50
   trainer.test_freq=4 # for 7B, 1 for 14B, 4 for all else
   trainer.resume_mode=disable # Force new run, don't recover from checkpoints
   # dumb settings
@@ -174,7 +174,7 @@ ARGS=(
   actor_rollout_ref.actor.kl_loss_type=low_var_kl # kl estimation method
   actor_rollout_ref.actor.entropy_coeff=0 # entropy bonus to encourage diverse responses
   actor_rollout_ref.rollout.name=vllm # backend for rollout's, ofc vllm
-  actor_rollout_ref.rollout.gpu_memory_utilization=0.85 # inference needs a lot of memory
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.3 # inference kv cache allocation.
   actor_rollout_ref.rollout.tensor_model_parallel_size=1 # tensor parallelism, if n_gpus > batch size
   actor_rollout_ref.rollout.enforce_eager=False # False, if True for debugging compile results
   actor_rollout_ref.rollout.dtype=bfloat16 # dtype, ofc bf16, maybe fp8 for some stuff
@@ -185,5 +185,8 @@ ARGS=(
 
 python3 -m verl.trainer.main_ppo "${ARGS[@]}"
 
-# TODO: squeezing more memory, check each process in nvidia-smi, has different mem consumption, tweak params that way
-# should run 4B again, and then 14B.
+# TODO:
+# 1. Run 1.7B on custom_flexible and strict
+# 2. Run 4B on custom_flexible and strict
+# 3. Run 0.6B on custom_flexible for 2x epochs
+# 4. Compare results between models.

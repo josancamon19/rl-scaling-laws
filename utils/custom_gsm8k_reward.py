@@ -37,10 +37,12 @@ def extract_solution_custom_flexible(solution_str: str):
 
 
 def compute_score(data_source, solution_str, ground_truth, extra_info=None):
+    default_method = "custom_flexible"
+
     method = (
-        "custom_flexible"
+        default_method
         if not extra_info
-        else extra_info.get("method", "custom_flexible")
+        else extra_info.get("method", default_method)
     )
 
     include_format_reward = False
@@ -58,5 +60,6 @@ def compute_score(data_source, solution_str, ground_truth, extra_info=None):
     score = 1.0 if final_answer == ground_truth else 0.0
     if include_format_reward and score and num_hashes != 1:
         # want the signal to be high reward, get the answer, but slightly worst if bad format, so there's certain bias towards that.
+        # DO NOT USE.
         return score - 0.2
     return score
