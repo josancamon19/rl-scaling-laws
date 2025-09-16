@@ -287,7 +287,7 @@ def plot_mmlu_performance(size: str):
 def plot_cross_model_math_comparison():
     """Create a cross-model comparison plot showing MATH performance for different sizes."""
     # Available model sizes
-    sizes = ['0.6b', '1.7b', '4b']
+    sizes = ['0.6b', '1.7b', '4b', '8b', '14b']
 
     # Data structure to hold results
     baseline_data = {'strict': {}, 'custom_flexible': {}}
@@ -650,7 +650,7 @@ def plot_cross_model_mmlu_comparison():
 
 def main():
     parser = argparse.ArgumentParser(description='Plot MATH and MMLU performance for different model sizes')
-    parser.add_argument('size', nargs='?', choices=['0.6b', '1.7b', '4b'],
+    parser.add_argument('size', nargs='?', choices=['0.6b', '1.7b', '4b', '8b', '14b'],
                        help='Model size to analyze (0.6b, 1.7b, or 4b). If not provided, creates cross-model comparison.')
     parser.add_argument('--cross-model', action='store_true',
                        help='Create cross-model comparison plot instead of single size plot')

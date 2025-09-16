@@ -6,14 +6,26 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 
-def plot_cross_model_comparison():
-    """Create a cross-model comparison plot showing baseline vs trained for different sizes."""
+def plot_cross_model_comparison(include_strict=True):
+    """Create a cross-model comparison plot showing baseline vs trained for different sizes.
+
+    Args:
+        include_strict: Whether to include strict method baselines/trained models.
+                       If False, only custom_flexible method will be shown.
+    """
     # Available model sizes
-    sizes = ['0.6b', '1.7b', '4b']
+    sizes = ['0.6b', '1.7b', '4b', '8b', '14b']
 
     # Data structure to hold results
-    baseline_data = {'strict': {}, 'custom_flexible': {}}
-    trained_data = {'strict': {}, 'custom_flexible': {}}
+    methods_to_include = ['custom_flexible']
+    if include_strict:
+        methods_to_include.append('strict')
+
+    baseline_data = {}
+    trained_data = {}
+    for method in methods_to_include:
+        baseline_data[method] = {}
+        trained_data[method] = {}
 
     for size in sizes:
         results_file = f"/root/rl-scaling-laws/results/{size}.json"
@@ -27,27 +39,42 @@ def plot_cross_model_comparison():
             data = json.load(f)
 
         # Extract data for this size
+        print(f"\nProcessing {size}.json:")
         for model in data['models']:
+            print(f"  Model: {model['model']}")
             if 'benchmarks' in model and 'gsm8k' in model['benchmarks']:
                 gsm8k_data = model['benchmarks']['gsm8k']['by_shot']
 
                 # Get 0-shot accuracy
                 if '0' in gsm8k_data and isinstance(gsm8k_data['0'], dict) and 'accuracy' in gsm8k_data['0']:
                     accuracy = gsm8k_data['0']['accuracy']
+                    print(f"    0-shot accuracy: {accuracy}")
 
                     # Check if this is a baseline model
                     is_baseline = 'metadata' in model and 'evaluation_method' in model['metadata']
 
                     if is_baseline:
                         eval_method = model['metadata']['evaluation_method']
-                        if eval_method in ['strict', 'custom_flexible']:
+                        print(f"    Evaluation method: {eval_method}")
+                        if eval_method in methods_to_include:
                             baseline_data[eval_method][size] = accuracy
+                            print(f"    ✓ Added to baseline_data[{eval_method}][{size}] = {accuracy}")
+                        else:
+                            print(f"    ✗ Skipped: evaluation_method '{eval_method}' not in methods_to_include {methods_to_include}")
                     else:
                         # Check reward method for trained models
                         if 'metadata' in model and 'reward_method' in model['metadata']:
                             reward_method = model['metadata']['reward_method']
-                            if reward_method in ['strict', 'custom_flexible']:
+                            print(f"    Reward method: {reward_method}")
+                            if reward_method in methods_to_include:
                                 trained_data[reward_method][size] = accuracy
+                                print(f"    ✓ Added to trained_data[{reward_method}][{size}] = {accuracy}")
+                            else:
+                                print(f"    ✗ Skipped: reward_method '{reward_method}' not in methods_to_include {methods_to_include}")
+                        else:
+                            print(f"    ✗ Skipped: no reward_method in metadata")
+            else:
+                print(f"    ✗ No GSM8k data found")
 
     # Create the plot
     plt.figure(figsize=(14, 10))
@@ -87,6 +114,21 @@ def plot_cross_model_comparison():
                     # 1.7b models: tooltip to the right
                     plt.text(x_pos + 0.02, y_pos, label_text,
                             ha='left', va='center', fontsize=9, alpha=0.9,
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                elif size == '8b':
+                    # 8b models: tooltip to the right
+                    plt.text(x_pos + 0.02, y_pos, label_text,
+                            ha='left', va='center', fontsize=9, alpha=0.9,
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                elif size == '4b':
+                    # 4b models: tooltip to the left
+                    plt.text(x_pos - 0.02, y_pos, label_text,
+                            ha='right', va='center', fontsize=9, alpha=0.9,
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                elif size == '14b':
+                    # 14b models: tooltip to the left
+                    plt.text(x_pos - 0.02, y_pos, label_text,
+                            ha='right', va='center', fontsize=9, alpha=0.9,
                             bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
                 else:
                     # Default: tooltip to the right for other sizes
@@ -136,6 +178,21 @@ def plot_cross_model_comparison():
                     plt.text(x_pos + 0.02, tooltip_y, label_text,
                             ha='left', va=va_align, fontsize=9, alpha=0.9,
                             bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                elif size == '8b':
+                    # 8b models: tooltip to the right
+                    plt.text(x_pos + 0.02, tooltip_y, label_text,
+                            ha='left', va=va_align, fontsize=9, alpha=0.9,
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                elif size == '4b':
+                    # 4b models: tooltip to the left
+                    plt.text(x_pos - 0.02, tooltip_y, label_text,
+                            ha='right', va=va_align, fontsize=9, alpha=0.9,
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
+                elif size == '14b':
+                    # 14b models: tooltip to the left
+                    plt.text(x_pos - 0.02, tooltip_y, label_text,
+                            ha='right', va=va_align, fontsize=9, alpha=0.9,
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
                 else:
                     # Default: tooltip to the left for other sizes (original behavior for trained models)
                     plt.text(x_pos - 0.02, tooltip_y, label_text,
@@ -143,7 +200,7 @@ def plot_cross_model_comparison():
                             bbox=dict(boxstyle="round,pad=0.2", facecolor='white', alpha=0.8))
 
     # Connect matching methods with dotted lines
-    for method in ['strict', 'custom_flexible']:
+    for method in methods_to_include:
         color = colors[method]
         sorted_sizes = sorted(sizes)
         vertical_offset = 0.8
@@ -163,7 +220,10 @@ def plot_cross_model_comparison():
     # Customize plot
     plt.xlabel('Model Type', fontsize=14)
     plt.ylabel('GSM8k Accuracy (%)', fontsize=14)
-    plt.title('Cross-Model Comparison: Baseline vs Trained\nGSM8k 0-shot Accuracy', fontsize=16)
+
+    # Update title based on methods included
+    method_desc = "Strict & Custom Flexible" if include_strict else "Custom Flexible Only"
+    plt.title(f'Cross-Model Comparison: Baseline vs Trained\nGSM8k 0-shot Accuracy ({method_desc})', fontsize=16)
 
     plt.xticks(x_positions, ['Baseline', 'Trained'], fontsize=12)
     plt.grid(True, alpha=0.3, axis='y')
@@ -177,7 +237,8 @@ def plot_cross_model_comparison():
     plt.tight_layout()
 
     # Save the plot
-    output_file = "/root/rl-scaling-laws/results/cross_model_gsm8k_comparison.png"
+    method_suffix = "_with_strict" if include_strict else "_custom_flexible_only"
+    output_file = f"/root/rl-scaling-laws/results/cross_model_gsm8k_comparison{method_suffix}.png"
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     print(f"Cross-model comparison plot saved to: {output_file}")
 
@@ -186,16 +247,19 @@ def plot_cross_model_comparison():
 
 def main():
     parser = argparse.ArgumentParser(description='Plot GSM8k accuracy vs shots for different models')
-    parser.add_argument('size', nargs='?', choices=['0.6b', '1.7b', '4b'],
+    parser.add_argument('size', nargs='?', choices=['0.6b', '1.7b', '4b', '8b', '14b'],
                        help='Model size to analyze (0.6b, 1.7b, or 4b). If not provided, creates cross-model comparison.')
     parser.add_argument('--cross-model', action='store_true',
                        help='Create cross-model comparison plot instead of single size plot')
+    parser.add_argument('--include-strict', action='store_true',
+                       help='Include strict method baselines/trained models in cross-model comparison. '
+                            'If not specified, only custom_flexible method will be shown.')
 
     args = parser.parse_args()
 
     # If cross-model flag is set or no size provided, do cross-model comparison
     if args.cross_model or not args.size:
-        plot_cross_model_comparison()
+        plot_cross_model_comparison(include_strict=args.include_strict)
         return
 
     # Otherwise, create the single-size plot

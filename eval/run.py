@@ -267,7 +267,7 @@ def _default_models():
     return [
         # "Qwen/Qwen3-0.6B-base",
         # "Qwen/Qwen3-1.7B-base",
-        "Qwen/Qwen3-4B-base",
+        # "Qwen/Qwen3-4B-base",
         # "Qwen/Qwen3-8B-base",
         # "Qwen/Qwen3-14B-base",
     ]
@@ -379,7 +379,7 @@ logging.getLogger("vllm").setLevel(logging.ERROR)
 def main():
     parser = argparse.ArgumentParser(description="Run benchmarks on language models")
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--shots", nargs="*", type=int, default=[0,1, 2, 3, 4, 5]) # 1, 2, 3, 4, 5
+    parser.add_argument("--shots", nargs="*", type=int, default=[0, 1, 2, 3, 4, 5])
     parser.add_argument("--include-mmlu", action="store_true", default=False)
     parser.add_argument("--include-math", action="store_true", default=False)
     parser.add_argument("--keep-samples", action="store_true", default=True)
@@ -414,8 +414,8 @@ def main():
         grpo_only=False,
         last_checkpoint_only=True,
         additional_models=[
-            "josancamon/qwen3-4b-grpo-lr1e-6-bs512-flexible",
-            "josancamon/qwen3-4b-grpo-lr1e-6-bs512-strict",
+            "josancamon/qwen3-8b-grpo-lr1e-6-bs512-flexible",
+            # "josancamon/qwen3-14b-grpo-lr1e-6-bs512-flexible",
         ],
     )
     print("model_list", model_list)
