@@ -15,7 +15,9 @@
     {
       "model": "Qwen/Qwen3-4B-base",
       "model_id": "Qwen/Qwen3-4B-base",
-      "metadata": {},
+      "metadata": {
+        "evaluation_method": "strict"
+      },
       "benchmarks": {
         "mmlu": {
           "by_shot": {
@@ -23,40 +25,6 @@
               "accuracy": 64.38541518302236,
               "correct": 9041,
               "total": 14042
-            }
-          }
-        },
-        "gsm8k": {
-          "by_shot": {
-            "0": {
-              "accuracy": 80.3639120545868,
-              "correct": 1060,
-              "total": 1319
-            },
-            "1": {
-              "accuracy": 76.19408642911296,
-              "correct": 1004,
-              "total": 1319
-            },
-            "2": {
-              "accuracy": 77.78620166793026,
-              "correct": 1026,
-              "total": 1319
-            },
-            "3": {
-              "accuracy": 78.62016679302502,
-              "correct": 1037,
-              "total": 1319
-            },
-            "4": {
-              "accuracy": 76.34571645185747,
-              "correct": 1007,
-              "total": 1319
-            },
-            "5": {
-              "accuracy": 77.93783169067476,
-              "correct": 1028,
-              "total": 1319
             }
           }
         },
@@ -98,10 +66,139 @@
               }
             }
           }
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 67.47536012130402,
+              "correct": 890,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 1.2130401819560273,
+              "correct": 16,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 0.7581501137225171,
+              "correct": 10,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 15.921152388172857,
+              "correct": 209,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 7.12661106899166,
+              "correct": 94,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 4.169825625473845,
+              "correct": 55,
+              "total": 1319
+            }
+          }
         }
+      },
+      "started_at": 1755799411,
+      "ended_at": 1755799644
+    },
+    {
+      "model": "Qwen/Qwen3-4B-base",
+      "model_id": "Qwen/Qwen3-4B-base",
+      "metadata": {
+        "evaluation_method": "custom_flexible"
+      },
+      "benchmarks": {
+        "mmlu": {},
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 80.3639120545868,
+              "correct": 1060,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 76.19408642911296,
+              "correct": 1004,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 77.78620166793026,
+              "correct": 1026,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 78.62016679302502,
+              "correct": 1037,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 76.34571645185747,
+              "correct": 1007,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 77.93783169067476,
+              "correct": 1028,
+              "total": 1319
+            }
+          }
+        },
+        "math": {}
       },
       "started_at": 1757983293,
       "ended_at": 1757983758
+    },
+    {
+      "model": "Qwen/Qwen3-4B-base",
+      "model_id": "Qwen/Qwen3-4B-base",
+      "metadata": {
+        "evaluation_method": "flexible"
+      },
+      "benchmarks": {
+        "mmlu": {
+          "by_shot": {}
+        },
+        "gsm8k": {
+          "by_shot": {
+            "0": {
+              "accuracy": 81.88021228203183,
+              "correct": 1079,
+              "total": 1319
+            },
+            "1": {
+              "accuracy": 1.4404852160727823,
+              "correct": 19,
+              "total": 1319
+            },
+            "2": {
+              "accuracy": 0.8339651250947688,
+              "correct": 11,
+              "total": 1319
+            },
+            "3": {
+              "accuracy": 16.603487490523122,
+              "correct": 218,
+              "total": 1319
+            },
+            "4": {
+              "accuracy": 8.112206216830932,
+              "correct": 107,
+              "total": 1319
+            },
+            "5": {
+              "accuracy": 4.321455648218348,
+              "correct": 57,
+              "total": 1319
+            }
+          }
+        }
+      },
+      "started_at": 1755802991,
+      "ended_at": 1755803194
     },
     {
       "model": "qwen3-4b-grpo-lr1e-6-bs512-flexible-global_step_56",
@@ -109,7 +206,8 @@
       "metadata": {
         "base_model": "josancamon/qwen3-4b-grpo-lr1e-6-bs512-flexible",
         "checkpoint": "global_step_56",
-        "revision": "global-step-56"
+        "revision": "global-step-56",
+        "reward_method": "custom_flexible"
       },
       "benchmarks": {
         "mmlu": {
@@ -204,7 +302,8 @@
       "metadata": {
         "base_model": "josancamon/qwen3-4b-grpo-lr1e-6-bs512-strict",
         "checkpoint": "global_step_56",
-        "revision": "global-step-56"
+        "revision": "global-step-56",
+        "reward_method": "strict"
       },
       "benchmarks": {
         "mmlu": {
