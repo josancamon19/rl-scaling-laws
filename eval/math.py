@@ -28,7 +28,7 @@ def run_math_evaluation(
         llm = LLM(**llm_kwargs)
 
     # Load MATH dataset
-    dataset_path = Path(f"/workspace/rl-scaling-laws/data/MATH/{split}.jsonl")
+    dataset_path = Path(f"./data/MATH/{split}.jsonl")
     print(f"Loading MATH dataset from {dataset_path}...")
 
     problems = []

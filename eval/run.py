@@ -265,9 +265,9 @@ def _model_already_evaluated(
 
 def _default_models():
     return [
-        "Qwen/Qwen3-0.6B-base",
+        # "Qwen/Qwen3-0.6B-base",
         # "Qwen/Qwen3-1.7B-base",
-        # "Qwen/Qwen3-4B-base",
+        "Qwen/Qwen3-4B-base",
         # "Qwen/Qwen3-8B-base",
         # "Qwen/Qwen3-14B-base",
     ]
@@ -379,7 +379,7 @@ logging.getLogger("vllm").setLevel(logging.ERROR)
 def main():
     parser = argparse.ArgumentParser(description="Run benchmarks on language models")
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--shots", nargs="*", type=int, default=[0])  # , 1, 2, 3, 4, 5
+    parser.add_argument("--shots", nargs="*", type=int, default=[0,1, 2, 3, 4, 5]) # 1, 2, 3, 4, 5
     parser.add_argument("--include-mmlu", action="store_true", default=False)
     parser.add_argument("--include-math", action="store_true", default=False)
     parser.add_argument("--keep-samples", action="store_true", default=True)
@@ -410,13 +410,13 @@ def main():
 
     # Configure model list directly here
     model_list = _build_model_list(
-        include_grpo=True,
-        grpo_only=True,
+        include_grpo=False,
+        grpo_only=False,
         last_checkpoint_only=True,
-        # additional_models=[
-        #     "josancamon/qwen3-0-6b-grpo-flexible-with-format",
-        #     "josancamon/qwen3-0-6b-grpo-flexible",
-        # ],
+        additional_models=[
+            "josancamon/qwen3-4b-grpo-lr1e-6-bs512-flexible",
+            "josancamon/qwen3-4b-grpo-lr1e-6-bs512-strict",
+        ],
     )
     print("model_list", model_list)
 
@@ -470,7 +470,7 @@ def main():
                 model=model_id,
                 revision=revision,
                 tensor_parallel_size=1,
-                gpu_memory_utilization=0.85,
+                gpu_memory_utilization=0.5,
                 trust_remote_code=True,
                 dtype="bfloat16",
                 enforce_eager=True,  # Disable CUDA graphs to save memory
@@ -480,7 +480,7 @@ def main():
 
             for k in args.shots:
                 # MMLU
-                if args.include_mmlu:
+                if args.include_mmlu and k == 0:
                     try:
                         mmlu_res = run_mmlu_evaluation(
                             model_id,
@@ -510,36 +510,36 @@ def main():
                         print(f"Error in MMLU evaluation for {k}-shot: {e}")
 
                 # GSM8K
-                # try:
-                #     gsm_res = run_gsm8k_evaluation(
-                #         model_id,
-                #         split="test",
-                #         num_shots=k,
-                #         temperature=args.temperature,
-                #         revision=revision,
-                #         llm=llm,
-                #     )
-                #     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                #         "accuracy": gsm_res.get("accuracy"),
-                #         "correct": gsm_res.get("correct"),
-                #         "total": gsm_res.get("total"),
-                #     }
+                try:
+                    gsm_res = run_gsm8k_evaluation(
+                        model_id,
+                        split="test",
+                        num_shots=k,
+                        temperature=args.temperature,
+                        revision=revision,
+                        llm=llm,
+                    )
+                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                        "accuracy": gsm_res.get("accuracy"),
+                        "correct": gsm_res.get("correct"),
+                        "total": gsm_res.get("total"),
+                    }
 
-                #     # Save samples if requested
-                #     if args.keep_samples and "prompts" in gsm_res:
-                #         _save_gsm8k_samples(
-                #             model_name=model_name,
-                #             num_shots=k,
-                #             prompts=gsm_res["prompts"],
-                #             ground_truths=gsm_res["ground_truths"],
-                #             responses=gsm_res["responses"],
-                #         )
+                    # Save samples if requested
+                    if args.keep_samples and "prompts" in gsm_res:
+                        _save_gsm8k_samples(
+                            model_name=model_name,
+                            num_shots=k,
+                            prompts=gsm_res["prompts"],
+                            ground_truths=gsm_res["ground_truths"],
+                            responses=gsm_res["responses"],
+                        )
 
-                # except Exception as e:
-                #     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                #         "error": str(e)
-                #     }
-                #     print(f"Error in GSM8K evaluation for {k}-shot: {e}")
+                except Exception as e:
+                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                        "error": str(e)
+                    }
+                    print(f"Error in GSM8K evaluation for {k}-shot: {e}")
 
                 # MATH (only supports 0-shot)
                 if args.include_math and k == 0:
@@ -591,5 +591,9 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # TODO: 0.6B results at the end decrease? check prompts
-    # TODO: 4B results wtf, same for 8,14, but check for 4B shots samples and verify prompts
+    # TODO: evaluate 1.7B baseline on custom_flexible and strict
+    # TODO: Evaluate trained custom_flexible and strict models on custom_flexible
+    # TODO: Evaluate the 3 of them on MATH
+    # TODO: ----- is the model til here getting better, consistently, and generalizing better with the appropiate rewards?
+    # TODO: repeat for 4B models, and do for 8B single trained.
+    # TODO: plot and explore.
