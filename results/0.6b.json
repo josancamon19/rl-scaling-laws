@@ -157,12 +157,12 @@
         {
             "model": "Qwen/Qwen3-0.6B-base",
             "model_id": "Qwen/Qwen3-0.6B-base",
-            "metadata": {},
+            "metadata": {
+                "evaluation_method": "custom_flexible"
+            },
             "benchmarks": {
                 "mmlu": {
-                    "by_shot": {
-                        "evaluation_method": "custom_flexible"
-                    }
+                    "by_shot": {}
                 },
                 "gsm8k": {
                     "by_shot": {
