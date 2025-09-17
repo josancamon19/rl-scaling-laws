@@ -83,7 +83,8 @@ def plot_scaling_laws():
 
     # Prepare data for plotting
     sizes = ["0.6b", "1.7b", "4b", "8b", "14b"]
-    size_values = [0.6, 1.7, 4.0, 8.0, 14.0]  # Convert to billions
+    # Actual parameter counts (excluding embeddings)
+    size_values = [0.44, 1.4, 3.6, 6.95, 13.2]  # billions of parameters
     gains = []
 
     print("\nCalculating RL gains:")
@@ -131,15 +132,21 @@ def plot_scaling_laws():
 
         print(f"    Power law: Gain = {a_fit:.3f} × (Model Size)^{b_fit:.3f}")
 
-        # Generate points for the fitted curve
-        x_fit = np.linspace(min(x_data), max(x_data), 100)
+        # Generate points for the fitted curve (extend to 32B = 31.2B params)
+        x_fit = np.linspace(min(x_data), 31.2, 100)
         y_fit = power_law(x_fit, a_fit, b_fit)
+
+        # Calculate 32B extrapolation
+        x_32b = 31.2  # 32B model = 31.2B parameters
+        y_32b = power_law(x_32b, a_fit, b_fit)
+        print(f"    32B extrapolation: Gain = {y_32b:.2f}%")
 
     except Exception as e:
         print(f"Power law fitting failed: {e}")
         print("Falling back to linear interpolation...")
         a_fit, b_fit = None, None
         x_fit, y_fit = None, None
+        x_32b, y_32b = None, None
 
     # Create the plot
     plt.figure(figsize=(12, 8))
@@ -168,6 +175,29 @@ def plot_scaling_laws():
             alpha=0.8,
         )
 
+        # Add 32B extrapolation point
+        plt.scatter(
+            [x_32b],
+            [y_32b],
+            color="#E63946",
+            s=150,
+            marker="*",
+            edgecolors="black",
+            linewidth=3,
+            zorder=10,
+            label="32B Extrapolation",
+        )
+        plt.annotate(
+            f"32B\n(est)\n+{y_32b:.1f}%",
+            (x_32b, y_32b),
+            xytext=(10, -30),
+            textcoords="offset points",
+            ha="left",
+            fontsize=10,
+            fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="yellow", alpha=0.9),
+        )
+
     # Add labels for each point
     for i, (size, x_val, gain) in enumerate(zip(valid_sizes, x_data, y_data)):
         plt.annotate(
@@ -185,7 +215,7 @@ def plot_scaling_laws():
     plt.yscale("log")
 
     # Customize the plot
-    plt.xlabel("Model Size (billions of parameters)", fontsize=14)
+    plt.xlabel("Model Parameters (billions, excluding embeddings)", fontsize=14)
     plt.ylabel("RL Gain (trained - baseline accuracy, %)", fontsize=14)
     plt.title(
         "GSM8K RL Scaling Laws\n(custom_flexible method, 0-shot accuracy)",

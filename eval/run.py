@@ -269,7 +269,7 @@ def _default_models():
         # "Qwen/Qwen3-1.7B-base",
         # "Qwen/Qwen3-4B-base",
         # "Qwen/Qwen3-8B-base",
-        # "Qwen/Qwen3-14B-base",
+        "Qwen/Qwen3-14B-base",
     ]
 
 
@@ -414,7 +414,7 @@ def main():
         grpo_only=False,
         last_checkpoint_only=True,
         additional_models=[
-            "josancamon/qwen3-8b-grpo-lr1e-6-bs512-flexible",
+            # "josancamon/qwen3-8b-grpo-lr1e-6-bs512-flexible",
             # "josancamon/qwen3-14b-grpo-lr1e-6-bs512-flexible",
         ],
     )
@@ -510,36 +510,36 @@ def main():
                         print(f"Error in MMLU evaluation for {k}-shot: {e}")
 
                 # GSM8K
-                try:
-                    gsm_res = run_gsm8k_evaluation(
-                        model_id,
-                        split="test",
-                        num_shots=k,
-                        temperature=args.temperature,
-                        revision=revision,
-                        llm=llm,
-                    )
-                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                        "accuracy": gsm_res.get("accuracy"),
-                        "correct": gsm_res.get("correct"),
-                        "total": gsm_res.get("total"),
-                    }
+                # try:
+                #     gsm_res = run_gsm8k_evaluation(
+                #         model_id,
+                #         split="test",
+                #         num_shots=k,
+                #         temperature=args.temperature,
+                #         revision=revision,
+                #         llm=llm,
+                #     )
+                #     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                #         "accuracy": gsm_res.get("accuracy"),
+                #         "correct": gsm_res.get("correct"),
+                #         "total": gsm_res.get("total"),
+                #     }
 
-                    # Save samples if requested
-                    if args.keep_samples and "prompts" in gsm_res:
-                        _save_gsm8k_samples(
-                            model_name=model_name,
-                            num_shots=k,
-                            prompts=gsm_res["prompts"],
-                            ground_truths=gsm_res["ground_truths"],
-                            responses=gsm_res["responses"],
-                        )
+                #     # Save samples if requested
+                #     if args.keep_samples and "prompts" in gsm_res:
+                #         _save_gsm8k_samples(
+                #             model_name=model_name,
+                #             num_shots=k,
+                #             prompts=gsm_res["prompts"],
+                #             ground_truths=gsm_res["ground_truths"],
+                #             responses=gsm_res["responses"],
+                #         )
 
-                except Exception as e:
-                    model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
-                        "error": str(e)
-                    }
-                    print(f"Error in GSM8K evaluation for {k}-shot: {e}")
+                # except Exception as e:
+                #     model_result["benchmarks"]["gsm8k"]["by_shot"][str(k)] = {
+                #         "error": str(e)
+                #     }
+                #     print(f"Error in GSM8K evaluation for {k}-shot: {e}")
 
                 # MATH (only supports 0-shot)
                 if args.include_math and k == 0:
