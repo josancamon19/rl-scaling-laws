@@ -438,9 +438,233 @@ def plot_compute_vs_performance():
     return fig, ax
 
 
+def plot_absolute_compute_scale():
+    """Create plot with absolute compute scale (not segmented)."""
+    # Define model configurations
+    models = {
+        "14b": {"params": 13.2, "color": "#D6336C", "label": "14B"},
+        "8b": {"params": 6.95, "color": "#3B82F6", "label": "8B"},
+        "4b": {"params": 3.6, "color": "#10B981", "label": "4B"},
+        "1.7b": {"params": 1.4, "color": "#F59E0B", "label": "1.7B"},
+        "0.6b": {"params": 0.44, "color": "#8B5CF6", "label": "0.6B"},
+    }
+    
+    pretraining_tokens = 36e12
+    csv_path = Path(__file__).parent.parent / "results" / "export.csv"
+    
+    # Create plot - extra wide to see RL progression
+    plt.style.use("seaborn-v0_8-darkgrid")
+    fig, ax = plt.subplots(figsize=(20, 9))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("#f8f9fa")
+    
+    model_data = {}
+    
+    # Load all model data
+    for model_key, model_info in models.items():
+        try:
+            steps, accuracies = load_model_data(csv_path, model_key)
+            
+            if len(steps) == 0:
+                continue
+            
+            # Calculate pre-training and RL compute
+            model_params = model_info["params"] * 1e9
+            pretraining_flops = 6 * model_params * pretraining_tokens
+            
+            flops_per_step = estimate_compute_per_step(
+                model_params_b=model_info["params"],
+                batch_size=512,
+                n_rollouts=3,
+                avg_prompt_tokens=200,
+                avg_response_tokens=150,
+                ppo_mini_batch_size=512,
+                n_gpus=8,
+            )
+            
+            rl_cumulative_flops = steps * flops_per_step
+            total_cumulative_flops = pretraining_flops + rl_cumulative_flops
+            
+            model_data[model_key] = {
+                "accuracies": accuracies,
+                "x_values": total_cumulative_flops,
+                "pretraining_flops": pretraining_flops,
+                "rl_flops": rl_cumulative_flops,
+                "info": model_info,
+            }
+            
+        except KeyError:
+            continue
+    
+    # Plot all models on absolute scale
+    for model_key, data in sorted(model_data.items(), key=lambda x: x[1]["pretraining_flops"]):
+        info = data["info"]
+        
+        # Plot the curve with every point visible
+        ax.plot(
+            data["x_values"],
+            data["accuracies"] * 100,
+            color=info["color"],
+            linewidth=4,
+            marker="o",
+            markersize=8,
+            markerfacecolor=info["color"],
+            markeredgecolor="white",
+            markeredgewidth=2.5,
+            label=f"{info['label']} ({data['accuracies'][0]:.1%} → {data['accuracies'][-1]:.1%})",
+            alpha=0.95,
+            zorder=5,
+            solid_capstyle="round",
+        )
+        
+        # Mark pre-training baseline
+        ax.scatter(
+            [data["pretraining_flops"]],
+            [data["accuracies"][0] * 100],
+            color=info["color"],
+            s=300,
+            marker="s",
+            edgecolors="white",
+            linewidth=3,
+            zorder=10,
+            alpha=0.9,
+        )
+        
+        # Mark final point
+        ax.scatter(
+            [data["x_values"][-1]],
+            [data["accuracies"][-1] * 100],
+            color=info["color"],
+            s=400,
+            marker="*",
+            edgecolors="white",
+            linewidth=3,
+            zorder=10,
+            alpha=1.0,
+        )
+    
+    # Set x-axis to log scale
+    ax.set_xscale('log')
+    
+    # Set x-axis limits with tighter range to show curves better
+    # Instead of spanning full range, focus on the region where data exists
+    min_compute = min(data["pretraining_flops"] for data in model_data.values())
+    max_compute = max(data["x_values"][-1] for data in model_data.values())
+    
+    # Use a much tighter range - only ~10x range instead of 30x
+    # This will make the RL curves visible
+    ax.set_xlim(min_compute * 0.5, max_compute * 1.5)
+    
+    # Customize plot
+    ax.set_xlabel(
+        "Total Compute (FLOPs) - Log Scale\nPre-training + RL Fine-tuning",
+        fontsize=14,
+        fontweight="bold",
+        color="#1F2937",
+        labelpad=12,
+    )
+    ax.set_ylabel(
+        "GSM8K Accuracy (%)",
+        fontsize=14,
+        fontweight="bold",
+        color="#1F2937",
+        labelpad=12,
+    )
+    ax.set_title(
+        "Absolute Compute Scale: Pre-training + RL Fine-tuning\n"
+        "Each curve shows complete compute trajectory from pre-training baseline",
+        fontsize=17,
+        fontweight="bold",
+        color="#111827",
+        pad=25,
+    )
+    
+    # Enhanced grid
+    ax.grid(True, alpha=0.25, linestyle="-", linewidth=0.8, color="#9CA3AF", which='both')
+    ax.set_axisbelow(True)
+    
+    # Improve spine styling
+    for spine in ax.spines.values():
+        spine.set_edgecolor("#D1D5DB")
+        spine.set_linewidth(1.5)
+    
+    # Add legend
+    legend = ax.legend(
+        loc="lower right",
+        fontsize=11,
+        framealpha=0.98,
+        edgecolor="#D1D5DB",
+        fancybox=True,
+        shadow=True,
+        title="Model Size (Initial → Final)",
+        title_fontsize=12,
+        borderpad=1.0,
+        labelspacing=0.8,
+    )
+    legend.get_frame().set_facecolor("#FFFFFF")
+    legend.get_frame().set_linewidth(2)
+    legend.get_title().set_fontweight("bold")
+    legend.get_title().set_color("#111827")
+    
+    # Add info box
+    info_text = (
+        "Configuration\n"
+        "───────────────\n"
+        "Pre-training: 36T tokens\n"
+        "RL Batch Size: 512\n"
+        "Rollouts/prompt: 3\n"
+        "Learning Rate: 1e-6\n\n"
+        "□  Pre-trained baseline\n"
+        "*  After RL fine-tuning"
+    )
+    ax.text(
+        0.015,
+        0.98,
+        info_text,
+        transform=ax.transAxes,
+        fontsize=10.5,
+        verticalalignment="top",
+        bbox=dict(
+            boxstyle="round,pad=1.0",
+            facecolor="#FFFFFF",
+            alpha=0.98,
+            edgecolor="#D1D5DB",
+            linewidth=2,
+        ),
+        fontfamily="sans-serif",
+        color="#1F2937",
+        linespacing=1.6,
+    )
+    
+    # Set y-axis range
+    all_accuracies = np.concatenate([data["accuracies"] for data in model_data.values()])
+    y_min = max(0, (min(all_accuracies) * 100) - 5)
+    y_max = min(100, (max(all_accuracies) * 100) + 5)
+    ax.set_ylim(y_min, y_max)
+    
+    # Format y-axis
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0f}%"))
+    ax.tick_params(axis="both", labelsize=11, colors="#374151", length=6, width=1.5)
+    
+    plt.tight_layout(pad=1.5)
+    
+    # Save plot
+    output_file = Path(__file__).parent.parent / "results" / "absolute_compute_vs_performance.png"
+    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    print(f"\nAbsolute scale plot saved to: {output_file}")
+    
+    return fig, ax
+
+
 def main():
     """Main function."""
-    plot_compute_vs_performance()
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "--absolute":
+        plot_absolute_compute_scale()
+    else:
+        plot_compute_vs_performance()
+    
     plt.show()
 
 
