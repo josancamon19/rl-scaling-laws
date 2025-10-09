@@ -51,7 +51,7 @@ def clean_export_csv(input_path: str, output_path: str = None):
     if output_path is None:
         input_file = Path(input_path)
         output_path = (
-            input_file.parent / f"{input_file.stem}_cleaned{input_file.suffix}"
+            input_file.parent / f"{input_file.stem}{input_file.suffix}"
         )
 
     # Write cleaned CSV
