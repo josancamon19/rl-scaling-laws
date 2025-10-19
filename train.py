@@ -76,11 +76,12 @@ def main(
         help="Reward extraction method: strict, flexible, or custom_flexible",
     ),
     # GRPO
-    dapo_clip_higher: bool = typer.Option(
-        True,
-        "--dapo-clip-higher",
-        help="Use asymmetric clipping (0.2/0.28) vs symmetric (0.2/0.2)",
-    ),
+    dapo_clip_higher: bool = True,
+    # dapo_clip_higher: bool = typer.Option(
+    #     True,
+    #     "--dapo-clip-higher",
+    #     help="Use asymmetric clipping (0.2/0.28) vs symmetric (0.2/0.2)",
+    # ),
     loss_agg_mode: str = typer.Option(
         "token-mean", "--loss-agg-mode", help="Loss aggregation mode"
     ),
@@ -191,7 +192,7 @@ def main(
         "custom_flexible": "compute_score_custom_flexible",
     }
     reward_function_name = reward_function_map[reward_method]
-    
+
     # Build training arguments
     args = [
         # Basic node config
