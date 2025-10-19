@@ -212,7 +212,7 @@ def main(
         "actor_rollout_ref.model.trust_remote_code=True",
         "actor_rollout_ref.model.use_fused_kernels=True",
         # Logging
-        "trainer.logger=['console, wandb']",
+        "trainer.logger=[console,wandb]",
         f"trainer.project_name={wandb_project_name}",
         f"trainer.experiment_name={experiment_name}",
         # Reward
